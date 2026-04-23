@@ -1,0 +1,23 @@
+{
+  "name": "b-m4th",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "game:full": "bun run src/tools/full-game.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test",
+    "ci": "bun run typecheck && bun run test",
+    "ci:engine": "bun test tests/engine"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/seedrandom": "^3.0.8"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "seedrandom": "^3.0.5"
+  }
+}
