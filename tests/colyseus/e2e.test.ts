@@ -44,14 +44,13 @@ async function jsonGet<T>(path: string): Promise<T> {
 
 interface CreateResponse {
   matchId: string;
-  hostToken: string;
-  guestToken: string;
+  inviteToken: string;
+  inviteLink: string;
   hostReservation: any;
 }
 
 interface ClaimResponse {
   matchId: string;
-  slot: "host" | "guest";
   reservation: any;
 }
 
@@ -60,39 +59,32 @@ describe("E2E: magic link → Colyseus join → gameplay", () => {
     // 1) Host creates a match
     const created = await jsonPost<CreateResponse>("/api/matches", { hostName: "Alice" });
     expect(created.matchId).toBeDefined();
-    expect(created.hostToken).not.toBe(created.guestToken);
+    expect(created.inviteToken).toBeDefined();
+    expect(created.inviteLink).toContain(`/invite/${created.inviteToken}`);
 
     // 2) Preview invite (non-destructive, what the InvitePage does)
-    const peek = await jsonGet<{ slot: string; hostName: string }>(
-      `/api/invites/${created.guestToken}`,
+    const peek = await jsonGet<{ hostName: string; maxPlayers: number; minPlayers: number }>(
+      `/api/invites/${created.inviteToken}`,
     );
-    expect(peek.slot).toBe("guest");
     expect(peek.hostName).toBe("Alice");
+    expect(peek.maxPlayers).toBe(2);
+    expect(peek.minPlayers).toBe(2);
 
-    // 3) Host already has a seat; guest claims the single live invite.
+    // 3) Host already has a seat; guest claims the live invite.
     const guestClaim = await jsonPost<ClaimResponse>(
-      `/api/invites/${created.guestToken}/claim`,
+      `/api/invites/${created.inviteToken}/claim`,
       { name: "Bob" },
     );
     expect(created.hostReservation).toBeDefined();
-    expect(guestClaim.slot).toBe("guest");
     expect(guestClaim.reservation).toBeDefined();
 
-    // 4) Host invite is invalidated after match creation; guest token is single-use.
-    const res = await fetch(`${httpBase}/api/invites/${created.hostToken}/claim`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Eve" }),
-    });
-    expect(res.status).toBe(404);
-
-    // 5) Consume seat reservations with the real SDK
+    // 4) Consume seat reservations with the real SDK
     const sdkHost = new ColyseusClient(wsBase);
     const sdkGuest = new ColyseusClient(wsBase);
     const hostRoom = await sdkHost.consumeSeatReservation<any>(created.hostReservation);
     const guestRoom = await sdkGuest.consumeSeatReservation<any>(guestClaim.reservation);
 
-    // 6) Host starts the match (no auto-start), then wait for phase=playing.
+    // 5) Host starts the match (no auto-start), then wait for phase=playing.
     hostRoom.send("startMatch", {});
     const deadline = Date.now() + 3000;
     while (Date.now() < deadline && hostRoom.state.phase !== "playing") {
@@ -102,7 +94,7 @@ describe("E2E: magic link → Colyseus join → gameplay", () => {
     expect(hostRoom.state.players.length).toBe(2);
     expect(hostRoom.state.board.length).toBe(15 * 15);
 
-    // 7) Private rack arrives out-of-band
+    // 6) Private rack arrives out-of-band
     const hostRacks: Array<{ tiles: unknown[] }> = [];
     hostRoom.onMessage("rack", (m: any) => hostRacks.push(m));
     hostRoom.send("ready", {});
@@ -112,7 +104,7 @@ describe("E2E: magic link → Colyseus join → gameplay", () => {
     }
     expect(hostRacks[0]?.tiles.length).toBe(8);
 
-    // 7b) Browser refresh/reconnect restores private rack via explicit request.
+    // 6b) Browser refresh/reconnect restores private rack via explicit request.
     const reconnectToken = (hostRoom as any).reconnectionToken as string | undefined;
     expect(reconnectToken).toBeTruthy();
     (hostRoom as any).connection?.close(4001);
@@ -127,7 +119,7 @@ describe("E2E: magic link → Colyseus join → gameplay", () => {
     }
     expect(rejoinedRacks[0]?.tiles.length).toBe(8);
 
-    // 8) Active player passes → turn advances
+    // 7) Active player passes → turn advances
     const firstPlayer = rejoinedHost.state.currentSessionId;
     const activeRoom = firstPlayer === rejoinedHost.sessionId ? rejoinedHost : guestRoom;
     await new Promise((r) => setTimeout(r, 600)); // avoid rate-limit race
