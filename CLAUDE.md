@@ -2,144 +2,96 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Default to using Bun instead of Node.js.
+## Project
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+B-M4TH is a two-player math-equation board game (Scrabble-like, 15×15 grid) playable in the browser over a Colyseus-authoritative server, with magic-link invitations. Game rules (tile distribution, scoring order, endgame triggers, time control) are authoritative in `rules.md` — consult before changing engine behavior. The rack size, premium square layout, and timing constants live in `GAME_CONFIG` (`src/entities/game.types.ts`).
+
+Runtime is **Bun**. TypeScript is `strict` with `noUncheckedIndexedAccess` and `experimentalDecorators` (required by `@colyseus/schema`).
 
 ## Commands
 
-```sh
-bun test                          # run all tests
-bun test tests/engine/tile-bag    # run a single test file
-bun test --watch                  # run tests in watch mode
+Root package:
+
+- `bun test` — run all tests (`bun:test`).
+- `bun test tests/engine/board.test.ts` — run a single test file.
+- `bun run typecheck` — `bunx tsc --noEmit`.
+- `bun run ci` — typecheck + all tests.
+- `bun run ci:engine` — engine tests only.
+- `bun run game:full` — greedy self-play simulator (`src/tools/full-game.ts`).
+- `bun run dev:server` — start the Colyseus server with `--hot` reload (port 2567).
+- `bun run start:server` — start the server without hot reload (production).
+
+Web client (`apps/web/`):
+
+- `cd apps/web && bun run dev` / `build` / `preview` / `typecheck`.
+
+**Local two-process dev setup:**
+
+```bash
+# terminal 1 — server
+PUBLIC_BASE_URL=http://localhost:5173 CLIENT_ORIGIN=http://localhost:5173 bun run dev:server
+
+# terminal 2 — frontend
+cd apps/web && bun run dev
 ```
 
-## APIs
+`PUBLIC_BASE_URL` tells the server which origin to use when minting magic links (so they land back on the Vite dev server, not the Colyseus port). `CLIENT_ORIGIN` restricts CORS to that origin.
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+## Path aliases
+
+Root `tsconfig.json`:
+
+- `@entities`, `@entities/*` → `src/entities/*`
+- `@engine`, `@engine/*` → `src/engine/*`
+
+Engine/server imports must use these. `tests/**` is excluded from `tsc` include but Bun still runs them.
+
+## Architecture
+
+Three layers: **pure engine core** (`src/engine` + `src/entities`), **authoritative multiplayer server** (`src/colyseus`), and a **React/PixiJS client** (`apps/web`). Game rules live only in the engine — never in the UI.
+
+### Engine (`src/engine/`)
+
+Pipeline for a play action: `lexer` → `evaluator` (single `=`, BODMAS) → `board` + `board-scanner` (15×15, cross-equations) → `move-validator` (first move, interconnection) → `scorer` (per-tile × piece-premium, equation-premium, +40 Bingo) → `tile-bag` (seeded RNG) → `turn-manager` (pass counter, phase) → `game-engine` (top-level `play` / `swap` / `pass`, `GameActionResult`). The engine handles Trigger-A endgame (empty rack + empty bag) internally; Trigger-B (3 consecutive passes) sets `phase=finished` but the rack-value adjustment is applied by the server wrapper.
+
+### Server (`src/colyseus/`)
+
+- `invite-store.ts` — crypto-random 32-byte tokens (base64url), TTL 1h, single-use via `consume()`, lazy sweep.
+- `match-registry.ts` — stores matchId/seed/hostName and the bound Colyseus roomId (lazy; only created on first claim to avoid leaking empty rooms).
+- `http.ts` — Express app: `POST /api/matches` (creates two invites + links), `GET /api/invites/:token` (preview, non-destructive), `POST /api/invites/:token/claim` (consumes invite → reserves a Colyseus seat, returns reservation payload).
+- `match-room.ts` — `Room<{ state: MatchStateSchema }>`, wraps `GameEngine`. Messages: `play` / `swap` / `pass` / `ready`, each Zod-validated + rate-limited (500ms/client). **Private racks are pushed via `client.send("rack", …)` only to the owning session** — never in the shared schema (avoids `@filter()` fragility). Turn clock is server-authoritative: bank deducted on settlement, overtime penalty (`ceil(overage/60s) × 10`) applied on turn transition. Clock keeps ticking while a player is disconnected — bank time is the natural ceiling on stall attacks. Trigger-B adjustment (each player's rack value × 2 added to the opponent's score) is applied in `applyTriggerBAdjustmentIfNeeded` when `consecutivePasses ≥ 3`.
+- `schema.ts` — `@colyseus/schema` classes for the public state (board, players, lastMove, clock). `useDefineForClassFields: false` is required for `@type` decorators to work.
+- `server.ts` — bootstrap: Express + `WebSocketTransport` on one HTTP server. Reads `PUBLIC_BASE_URL` / `CLIENT_ORIGIN` envs.
+
+**Magic-link flow:** host `POST /api/matches` → server returns host+guest links → each player opens their link → client calls `/claim` with name → server consumes invite, calls `matchMaker.reserveSeatFor`, returns reservation → client `consumeSeatReservation` to join Colyseus. Reservations (not raw tokens) authenticate the WebSocket join, so the token never crosses the WS boundary.
+
+### Client (`apps/web/`)
+
+Three-layer split:
+
+- **React** (`src/pages/`, `src/ui/`) — pages (Home, Invite, Match), rack, score panel, turn controls, blank-assignment modal. Mantine v9 for components.
+- **PixiJS** (`src/scene/board-scene.ts`) — 15×15 grid, premium-cell coloring, placed tiles (solid) vs pending (ghost), hover highlight. Redraws only on `turnNumber` change (not on every 20 fps clock patch) for performance.
+- **Colyseus client** (`src/net/colyseus.ts`) — single active `Room` ref, state projection into Zustand store, private rack stored out of the shared state. Reconnection token is stashed in **`sessionStorage`** (tab-scoped, not `localStorage`). `MatchPage` calls `tryReconnect()` on mount if no room is active.
+
+**Drag-drop bridge:** `useMatchStore.drag` is a shared DnD state. React rack sets `drag.tileId` on `pointerdown`; the Pixi scene reports hover cell via callbacks; on `pointerup` over a cell the store commits a `PendingPlacement`. The React rack uses `touch-action: none` and pointer capture to work on mobile. Blank tiles open a modal via a DOM `CustomEvent` (`b-m4th:assign-blank`) so the placement completes once an assigned face is chosen.
+
+## Security / input-handling notes
+
+- All inbound messages (`play` / `swap` / `pass`) are Zod-validated before reaching the engine. Position bounds (0..14), tile-id length caps, max-moves = rack size.
+- Invite tokens are 32 bytes from `crypto.randomBytes`, base64url, TTL 1h, single-use.
+- `@colyseus/schema` never carries private rack tiles; opponent rack state is only `rackCount`.
+- CORS is locked to `CLIENT_ORIGIN` in production. The magic-link token is single-use — leaking it after claim gives no attacker capability.
+- Rate limit: 500 ms between actions per client.
+- Auto-dispose: Colyseus rooms disappear when the last client leaves (room is not created until the first `/claim`).
 
 ## Testing
 
-Use `bun test` to run tests.
+- `tests/engine/` — pure engine unit tests (mirror module layout). Keep deterministic; seed any RNG.
+- `tests/colyseus/` — invite-store unit tests, HTTP-route tests (spins up ephemeral Express on `127.0.0.1:0`), and `@colyseus/testing` integration tests for the `MatchRoom` (two clients join, private rack push, pass action, clock settlement).
+- `tests/web/` — scaffold smoke check.
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
+## Style
 
-test("hello world", () => {
-  expect(1).toBe(1);
-});
-```
-
-## Frontend
-
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
-
-## Project: "Project Equation" — A-Math Style Board Game
-
-A server-authoritative, real-time multiplayer math board game (15×15 grid). Currently in **Phase 1: Core Game Engine** (pure TypeScript, no server or UI yet). See `plan.md` for the full 5-phase roadmap and `todo.md` for the current step checklist.
-
-### Architecture
-
-The engine is built as isolated, framework-agnostic TypeScript modules:
-
-- **`src/entities/`** — Domain types and pure data (`Tile`, `Board`, `Player`, `GameState`). All exported via barrel at `src/entities/index.ts`.
-- **`src/engine/`** — Stateful logic classes (`TileBag`, and future: `Board`, `TurnManager`, `Lexer`, `Evaluator`, `Scorer`, `GameEngine`).
-- **`tests/`** mirrors `src/` structure (e.g. `tests/engine/tile-bag.test.ts`).
-
-### Path Aliases
-
-Configured in `tsconfig.json`:
-- `@entities` → `src/entities`
-- `@engine` → `src/engine`
-
-### Key Domain Rules
-
-- Tiles: 100-tile bag — digits (0–20), operators (`+`, `-`, `×`, `÷`, `=`), combo tiles (`+/-`, `×/÷`), and 4 BLANKs.
-- BLANK tiles and combo tiles (`+/-`, `×/÷`) require assignment via `assignTile()` before use.
-- `getEffectiveFace(tile)` returns `assignedFace ?? face` — always use this when reading a tile's value.
-- `TileBag.create(seed)` uses `seedrandom` for deterministic shuffles; `canSwap()` requires >5 tiles in bag.
-- `GAME_CONFIG` (in `game.types.ts`) holds all numeric constants: board size (15), rack size (8), bingo bonus (+40), time limits, etc.
-- Scoring: tile base values + 2×/3× piece multipliers on newly placed tiles + 2×/3× equation multipliers (compounding) + Bingo (+40 for playing all 8 tiles). Premium squares only count on the turn first placed.
-- Endgame: Trigger A (empty bag + empty rack) or Trigger B (3 consecutive passes). Opponent's remaining tiles × 2 are awarded to the finishing player.
+- kebab-case filenames (`tile-bag.ts`), PascalCase classes (`TileBag`), camelCase for everything else.
+- Prefer small pure modules. Import via `@engine/*` / `@entities/*` aliases.
+- Imperative, scoped commit messages (e.g. `engine: validate out-of-bounds placement`).
