@@ -1,0 +1,12 @@
+.git
+.github
+.codex
+.claude
+node_modules
+apps/web/node_modules
+coverage
+dist
+out
+logs
+*.log
+**/.DS_Store

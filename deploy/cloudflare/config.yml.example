@@ -1,0 +1,9 @@
+tunnel: <TUNNEL_UUID>
+credentials-file: /home/<user>/.cloudflared/<TUNNEL_UUID>.json
+
+ingress:
+  - hostname: game.example.com
+    service: http://localhost:5173
+  - hostname: api.example.com
+    service: http://localhost:2567
+  - service: http_status:404

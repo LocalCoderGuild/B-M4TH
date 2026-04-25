@@ -1,0 +1,47 @@
+# Docker deploy (public IP)
+
+This setup runs:
+
+- `web` on host port `80` (nginx serving built `apps/web/dist`)
+- `server` on host port `2567` (Colyseus + API)
+
+## 1) Prepare env
+
+```bash
+cd /home/simon/Documents/Projects/B-M4TH
+cp deploy/docker/.env.example .env
+```
+
+Edit `.env` values:
+
+- `PUBLIC_BASE_URL`: web URL users open (example: `http://203.0.113.10`)
+- `CLIENT_ORIGIN`: same as web origin
+- `VITE_SERVER_URL`: API URL used by frontend (example: `http://203.0.113.10:2567`)
+- optional host ports (`WEB_EXPOSE_PORT`, `API_EXPOSE_PORT`)
+
+## 2) Build and run
+
+```bash
+cd /home/simon/Documents/Projects/B-M4TH
+docker compose up -d --build
+```
+
+## 3) Check
+
+```bash
+docker compose ps
+curl http://127.0.0.1:2567/api/health
+```
+
+## 4) Update
+
+```bash
+cd /home/simon/Documents/Projects/B-M4TH
+docker compose up -d --build
+```
+
+## Notes
+
+- If you change `VITE_SERVER_URL`, rebuild `web` (`docker compose up -d --build web`).
+- Open firewall for both exposed ports (default `80` and `2567`).
+- For production TLS, place Nginx/Caddy/Traefik in front and switch env URLs to `https://...`.
