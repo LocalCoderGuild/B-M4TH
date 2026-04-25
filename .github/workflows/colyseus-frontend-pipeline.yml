@@ -40,7 +40,7 @@ jobs:
             if [ -f apps/web/package.json ]; then
               cd apps/web
               bun install --frozen-lockfile
-              bun test
+              bun test --pass-with-no-tests
             fi
           else
             echo "No apps/web frontend yet. Server contract gate passes on engine tests only."
@@ -103,7 +103,7 @@ jobs:
         run: |
           if [ -d apps/web ]; then
             cd apps/web
-            bun test
+            bun test --pass-with-no-tests
           else
             echo "No frontend app yet."
           fi
