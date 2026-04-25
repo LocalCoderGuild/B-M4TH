@@ -18,6 +18,10 @@ describe("lex - single-digit tiles", () => {
     expect(lex(["1", "2", "3"])).toEqual([{ type: "number", value: 123 }]);
   });
 
+  test("blank concat 3 tiles: 9 8 6 → 986", () => {
+    expect(lex(["9", "8", "6"])).toEqual([{ type: "number", value: 986 }]);
+  });
+
   test("single-digit tiles separated by operator do not concatenate", () => {
     expect(lex(["1", "+", "0"])).toEqual([
       { type: "number", value: 1 },
@@ -90,6 +94,46 @@ describe("lex - full equations", () => {
 
   test("empty array produces empty token list", () => {
     expect(lex([])).toEqual([]);
+  });
+});
+
+describe("lex - 3-digit concatenation limit", () => {
+  test("3 adjacent digits is valid: 1 4 5 → 145", () => {
+    expect(lex(["1", "4", "5"])).toEqual([{ type: "number", value: 145 }]);
+  });
+
+  test("4 adjacent digits throws LexError: 6 7 7 7", () => {
+    expect(() => lex(["6", "7", "7", "7"])).toThrow(LexError);
+  });
+
+  test("4-digit number on right side of equation throws LexError", () => {
+    expect(() => lex(["1", "=", "1", "0", "0", "0"])).toThrow(LexError);
+  });
+});
+
+describe("lex - leading zero in concatenated numbers", () => {
+  test("0 alone is valid", () => {
+    expect(lex(["0"])).toEqual([{ type: "number", value: 0 }]);
+  });
+
+  test("0 followed by 9 throws LexError (leading zero)", () => {
+    expect(() => lex(["0", "9"])).toThrow(LexError);
+  });
+
+  test("0 followed by 0 throws LexError (leading zero)", () => {
+    expect(() => lex(["0", "0"])).toThrow(LexError);
+  });
+
+  test("0 followed by digits in expression throws LexError", () => {
+    expect(() => lex(["0", "5", "+", "1", "=", "1"])).toThrow(LexError);
+  });
+
+  test("non-zero leading digit is fine: 1 0 → 10", () => {
+    expect(lex(["1", "0"])).toEqual([{ type: "number", value: 10 }]);
+  });
+
+  test("leading zero with 3 digits throws LexError: 0 9 9", () => {
+    expect(() => lex(["0", "9", "9"])).toThrow(LexError);
   });
 });
 

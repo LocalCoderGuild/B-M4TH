@@ -13,6 +13,13 @@ export class LexError extends Error {
 const SINGLE_DIGIT_RE = /^\d$/;
 const MULTI_DIGIT_RE = /^\d{2,}$/;
 
+function flushNumBuffer(buf: string): Token {
+  if (buf.length > 1 && buf[0] === "0") {
+    throw new LexError(`Multi-digit number cannot have a leading zero: "${buf}"`);
+  }
+  return { type: "number", value: parseInt(buf, 10) };
+}
+
 export function lex(faces: string[]): Token[] {
   const tokens: Token[] = [];
   let numBuffer = "";
@@ -25,6 +32,11 @@ export function lex(faces: string[]): Token[] {
       if (prevWasNumber && numBuffer === "") {
         throw new LexError(
           `Single-digit tile "${face}" cannot be placed adjacent to a multi-digit tile`,
+        );
+      }
+      if (numBuffer.length >= 3) {
+        throw new LexError(
+          `Number too long: concatenated digits cannot exceed 3 digits ("${numBuffer}${face}")`,
         );
       }
       numBuffer += face;
@@ -45,7 +57,7 @@ export function lex(faces: string[]): Token[] {
     } else {
       // operator or equals: flush single-digit buffer first
       if (numBuffer !== "") {
-        tokens.push({ type: "number", value: parseInt(numBuffer, 10) });
+        tokens.push(flushNumBuffer(numBuffer));
         numBuffer = "";
       }
       prevWasNumber = false;
@@ -60,7 +72,7 @@ export function lex(faces: string[]): Token[] {
   }
 
   if (numBuffer !== "") {
-    tokens.push({ type: "number", value: parseInt(numBuffer, 10) });
+    tokens.push(flushNumBuffer(numBuffer));
   }
 
   return tokens;
