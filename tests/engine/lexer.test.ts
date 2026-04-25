@@ -18,6 +18,10 @@ describe("lex - single-digit tiles", () => {
     expect(lex(["1", "2", "3"])).toEqual([{ type: "number", value: 123 }]);
   });
 
+  test("blank concat 3 tiles: 9 8 6 → 986", () => {
+    expect(lex(["9", "8", "6"])).toEqual([{ type: "number", value: 986 }]);
+  });
+
   test("single-digit tiles separated by operator do not concatenate", () => {
     expect(lex(["1", "+", "0"])).toEqual([
       { type: "number", value: 1 },

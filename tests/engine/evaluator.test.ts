@@ -132,6 +132,22 @@ describe("evaluate - chain equations", () => {
   test("adjacent equals signs throw EvaluatorError (empty segment)", () => {
     expect(() => eq(["1", "=", "=", "1"])).toThrow(EvaluatorError);
   });
+
+  test("15-tile chain with multiple equals: 1+2=3=1×3=9÷3=3 is true", () => {
+    expect(eq(["1", "+", "2", "=", "3", "=", "1", "×", "3", "=", "9", "÷", "3", "=", "3"])).toBe(true);
+  });
+
+  test("chain with minus: 5-2=3=4-1=3 is true", () => {
+    expect(eq(["5", "-", "2", "=", "3", "=", "4", "-", "1", "=", "3"])).toBe(true);
+  });
+
+  test("chain with minus: 9-3=6=8-2=10-4=6 is true", () => {
+    expect(eq(["9", "-", "3", "=", "6", "=", "8", "-", "2", "=", "1", "0", "-", "4", "=", "6"])).toBe(true);
+  });
+
+  test("chain with blanks and 3 equals: -8+2×3=-2=10-12=-2 is true", () => {
+    expect(eq(["-", "8", "+", "2", "×", "3", "=", "-", "2", "=", "1", "0", "-", "1", "2", "=", "-", "2"])).toBe(true);
+  });
 });
 
 describe("evaluate - structural errors", () => {
