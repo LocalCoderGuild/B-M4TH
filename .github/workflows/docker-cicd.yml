@@ -27,13 +27,13 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: cd apps/game && bun install --frozen-lockfile
 
       - name: Typecheck
-        run: bun run typecheck
+        run: cd apps/game && bun run typecheck
 
       - name: Engine regression tests
-        run: bun run ci:engine
+        run: cd apps/game && bun run ci:engine
 
   docker-build-push:
     name: Build and Push Docker Images

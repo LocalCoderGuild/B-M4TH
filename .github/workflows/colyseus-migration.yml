@@ -27,10 +27,10 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: cd apps/game && bun install --frozen-lockfile
 
       - name: Typecheck + full tests
-        run: bun run ci
+        run: cd apps/game && bun run ci
 
   migration-readiness:
     name: Migration Readiness Gate
@@ -46,19 +46,19 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: cd apps/game && bun install --frozen-lockfile
 
       - name: Engine regression tests (must stay green during migration)
-        run: bun run ci:engine
+        run: cd apps/game && bun run ci:engine
 
       - name: Optional Colyseus smoke tests
         shell: bash
         run: |
-          if [ -d tests/colyseus ]; then
-            echo "Found tests/colyseus, running smoke suite..."
-            bun test tests/colyseus
+          if [ -d apps/game/test/colyseus ]; then
+            echo "Found apps/game/test/colyseus, running smoke suite..."
+            cd apps/game && bun test test/colyseus
           else
-            echo "No tests/colyseus directory yet. Skipping Colyseus smoke tests."
+            echo "No apps/game/test/colyseus directory yet. Skipping Colyseus smoke tests."
           fi
 
   build-package:
@@ -75,9 +75,9 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: cd apps/game && bun install --frozen-lockfile
 
       - name: Validate lock + scripts
         run: |
-          bun run typecheck
-          bun run ci:engine
+          cd apps/game && bun run typecheck
+          cd apps/game && bun run ci:engine

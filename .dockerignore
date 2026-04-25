@@ -3,6 +3,7 @@
 .codex
 .claude
 node_modules
+apps/game/node_modules
 apps/web/node_modules
 coverage
 dist
