@@ -10,7 +10,7 @@
     "typecheck": "bunx tsc --noEmit",
     "test": "bun test",
     "ci": "bun run typecheck && bun run test",
-    "ci:engine": "bun test tests/engine"
+    "ci:engine": "bun test test/engine"
   },
   "devDependencies": {
     "@colyseus/sdk": "^0.17.41",
