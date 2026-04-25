@@ -4,8 +4,10 @@ import { sendPickColor, sendSetTimeControl, sendStartMatch } from "../net/colyse
 import { InviteShare } from "./InviteShare";
 import {
   PLAYER_COLOR_KEYS,
+  getColorHex,
   getPlayerColorVars,
   getSwatchHex,
+  isHexColor,
   resolvePlayerColorKey,
   type PlayerColorKey,
 } from "./player-colors";
@@ -84,9 +86,11 @@ export function LobbyView() {
   };
 
   const me = snapshot?.players.find((p) => p.sessionId === mySessionId);
-  const myColorKey: PlayerColorKey | null = me
+  const myColorIsCustomHex = me ? isHexColor(me.color) : false;
+  const myColorKey: PlayerColorKey | null = me && !myColorIsCustomHex
     ? resolvePlayerColorKey(me.color, me.seatIndex)
     : null;
+  const myColorHex = me ? getColorHex(me.color, me.seatIndex) : "#d76a2d";
   const takenByOthers = new Set<string>();
   for (const p of snapshot?.players ?? []) {
     if (p.sessionId !== mySessionId && p.color) takenByOthers.add(p.color);
@@ -134,27 +138,42 @@ export function LobbyView() {
       {me && (
         <section className="lobby-section">
           <h2 className="lobby-section-title">Your color</h2>
-          <div className="lobby-color-grid" role="radiogroup" aria-label="Player color">
-            {PLAYER_COLOR_KEYS.map((key) => {
-              const taken = takenByOthers.has(key);
-              const selected = myColorKey === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  aria-label={key}
-                  title={taken && !selected ? `${key} (taken)` : key}
-                  className={`lobby-color-swatch${selected ? " is-selected" : ""}${taken && !selected ? " is-taken" : ""}`}
-                  style={{ background: getSwatchHex(key) }}
-                  disabled={taken && !selected}
-                  onClick={() => {
-                    if (!selected) sendPickColor(key);
-                  }}
-                />
-              );
-            })}
+          <div className="lobby-color-row">
+            <div className="lobby-color-grid" role="radiogroup" aria-label="Player color">
+              {PLAYER_COLOR_KEYS.map((key) => {
+                const taken = takenByOthers.has(key);
+                const selected = myColorKey === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    aria-label={key}
+                    title={taken && !selected ? `${key} (taken)` : key}
+                    className={`lobby-color-swatch${selected ? " is-selected" : ""}${taken && !selected ? " is-taken" : ""}`}
+                    style={{ background: getSwatchHex(key) }}
+                    disabled={taken && !selected}
+                    onClick={() => {
+                      if (!selected) sendPickColor(key);
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <label
+              className={`lobby-color-swatch lobby-color-swatch-custom${myColorIsCustomHex ? " is-selected" : ""}`}
+              title="Custom color"
+              aria-label="Custom color"
+              style={{ background: myColorHex }}
+            >
+              <input
+                type="color"
+                className="lobby-color-input-hidden"
+                value={myColorHex}
+                onChange={(e) => sendPickColor(e.target.value)}
+              />
+            </label>
           </div>
         </section>
       )}

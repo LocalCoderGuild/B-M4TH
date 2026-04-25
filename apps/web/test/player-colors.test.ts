@@ -4,7 +4,7 @@ import {
   defaultColorForSeat,
   getPlayerPaletteByKey,
   resolvePlayerColorKey,
-} from "../../apps/web/src/ui/player-colors";
+} from "../src/ui/player-colors";
 
 describe("player color palette", () => {
   test("each palette key maps to a distinct hex color", () => {

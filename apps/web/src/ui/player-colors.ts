@@ -11,6 +11,28 @@ interface PlayerPalette {
   ring: string;
 }
 
+export function isHexColor(s: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(s);
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
+
+function derivePaletteFromHex(hex: string): PlayerPalette {
+  const [r, g, b] = hexToRgb(hex);
+  const shadow = `#${[r, g, b].map((c) => Math.round(c * 0.6).toString(16).padStart(2, "0")).join("")}`;
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return {
+    color: hex,
+    shadow,
+    tint: `rgba(${r}, ${g}, ${b}, 0.18)`,
+    contrast: lum > 0.45 ? "#0d0d0d" : "#f0f0f0",
+    ring: `rgba(${r}, ${g}, ${b}, 0.48)`,
+  };
+}
+
 const PALETTES: Record<PlayerColorKey, PlayerPalette> = {
   orange: {
     color: "#d76a2d",
@@ -87,8 +109,9 @@ export function resolvePlayerColorKey(
 }
 
 export function getPlayerColorVars(seatIndex: number, color?: string | null): PlayerColorVars {
-  const key = resolvePlayerColorKey(color, seatIndex);
-  const palette = PALETTES[key];
+  const palette = color && isHexColor(color)
+    ? derivePaletteFromHex(color)
+    : PALETTES[resolvePlayerColorKey(color, seatIndex)];
   return {
     "--player-color": palette.color,
     "--player-shadow": palette.shadow,
@@ -100,4 +123,10 @@ export function getPlayerColorVars(seatIndex: number, color?: string | null): Pl
 
 export function getSwatchHex(key: PlayerColorKey): string {
   return PALETTES[key].color;
+}
+
+/** Returns the hex string for any color value (preset key or raw hex), falling back to seat default. */
+export function getColorHex(color: string | null | undefined, seatIndex: number): string {
+  if (color && isHexColor(color)) return color;
+  return PALETTES[resolvePlayerColorKey(color, seatIndex)].color;
 }

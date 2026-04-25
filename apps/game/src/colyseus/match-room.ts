@@ -102,7 +102,10 @@ export const PLAYER_COLOR_KEYS = ["orange", "cyan", "pink", "green", "violet", "
 export type PlayerColorKey = (typeof PLAYER_COLOR_KEYS)[number];
 
 const pickColorSchema = z.object({
-  color: z.enum(PLAYER_COLOR_KEYS),
+  color: z.union([
+    z.enum(PLAYER_COLOR_KEYS),
+    z.string().regex(/^#[0-9a-f]{6}$/i, "Must be a preset key or 6-digit hex color"),
+  ]),
 });
 
 const pendingUpdateMoveSchema = z.object({
