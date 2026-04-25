@@ -131,6 +131,10 @@ describe("lex - leading zero in concatenated numbers", () => {
   test("non-zero leading digit is fine: 1 0 → 10", () => {
     expect(lex(["1", "0"])).toEqual([{ type: "number", value: 10 }]);
   });
+
+  test("leading zero with 3 digits throws LexError: 0 9 9", () => {
+    expect(() => lex(["0", "9", "9"])).toThrow(LexError);
+  });
 });
 
 describe("lex - invalid mixing of single and multi-digit tiles", () => {

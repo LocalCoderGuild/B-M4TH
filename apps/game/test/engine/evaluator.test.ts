@@ -84,6 +84,10 @@ describe("evaluate - integer division enforcement", () => {
   test("division by zero throws EvaluatorError", () => {
     expect(() => eq(["5", "÷", "0", "=", "1"])).toThrow(EvaluatorError);
   });
+
+  test("099 in equation throws LexError (leading zero)", () => {
+    expect(() => eq(["0", "9", "9", "+", "1", "=", "1", "0", "0"])).toThrow(LexError);
+  });
 });
 
 describe("evaluate - unary minus", () => {
