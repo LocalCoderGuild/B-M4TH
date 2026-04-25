@@ -1,0 +1,36 @@
+{
+  "name": "b-m4th",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "game:full": "bun run src/tools/full-game.ts",
+    "dev:server": "bun run --hot src/colyseus/server.ts",
+    "start:server": "bun run src/colyseus/server.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test",
+    "ci": "bun run typecheck && bun run test",
+    "ci:engine": "bun test tests/engine"
+  },
+  "devDependencies": {
+    "@colyseus/sdk": "^0.17.41",
+    "@colyseus/testing": "^0.17.11",
+    "@types/bun": "latest",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/seedrandom": "^3.0.8"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@colyseus/schema": "^4.0.20",
+    "@colyseus/tools": "^0.17.19",
+    "@colyseus/ws-transport": "^0.17.13",
+    "colyseus": "^0.17.10",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "seedrandom": "^3.0.5",
+    "zod": "^4.3.6"
+  }
+}

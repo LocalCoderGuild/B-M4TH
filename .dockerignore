@@ -1,0 +1,17 @@
+.git
+.github
+.codex
+.claude
+node_modules
+apps/web/node_modules
+coverage
+dist
+out
+logs
+*.log
+**/.DS_Store
+
+# Private planning docs (exclude from build context)
+todo.md
+rules.md
+stacks.md
