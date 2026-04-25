@@ -21,6 +21,8 @@ export type GameActionResult =
 export interface CreateGameOptions {
   seed?: number | string;
   startPosition?: Position;
+  /** Pass-out threshold ("everyone passes once in a row"). Defaults to players.length. */
+  consecutivePassesLimit?: number;
 }
 
 export interface GameEngineSetup {
@@ -33,6 +35,7 @@ export interface GameEngineSetup {
   turnNumber?: number;
   isFirstMove?: boolean;
   rngSeed?: number | string;
+  consecutivePassesLimit?: number;
 }
 
 function cloneTile(tile: Tile): Tile {
@@ -61,6 +64,7 @@ export class GameEngine {
   private turnNumber: number;
   private isFirstMove: boolean;
   private readonly swapRng: seedrandom.PRNG;
+  private readonly consecutivePassesLimit: number;
 
   private constructor(setup: Required<GameEngineSetup>) {
     this.board = setup.board;
@@ -72,6 +76,11 @@ export class GameEngine {
     this.turnNumber = setup.turnNumber;
     this.isFirstMove = setup.isFirstMove;
     this.swapRng = seedrandom(String(setup.rngSeed));
+    this.consecutivePassesLimit = setup.consecutivePassesLimit;
+  }
+
+  getConsecutivePassesLimit(): number {
+    return this.consecutivePassesLimit;
   }
 
   static create(playerIds: string[], options: CreateGameOptions = {}): GameEngine {
@@ -96,6 +105,7 @@ export class GameEngine {
       turnNumber: 1,
       isFirstMove: true,
       rngSeed: seed,
+      consecutivePassesLimit: options.consecutivePassesLimit ?? playerIds.length,
     });
   }
 
@@ -113,6 +123,7 @@ export class GameEngine {
       turnNumber: setup.turnNumber ?? 1,
       isFirstMove: setup.isFirstMove ?? true,
       rngSeed: setup.rngSeed ?? "setup",
+      consecutivePassesLimit: setup.consecutivePassesLimit ?? setup.players.length,
     });
   }
 
@@ -217,6 +228,49 @@ export class GameEngine {
     };
   }
 
+  /** Read-only: place tiles temporarily, validate + score, then revert. Returns the
+   *  potential score for the given moves without committing any state change. */
+  previewPlay(
+    moves: Array<{ tileId: string; position: Position; assignedFace?: BlankAssignment }>,
+  ): { ok: true; score: number } | { ok: false; error: string } {
+    if (this.phase !== "playing") {
+      return { ok: false, error: "Game is not in playing phase" };
+    }
+    if (moves.length === 0) {
+      return { ok: true, score: 0 };
+    }
+    const player = this.players[this.currentPlayerIndex]!;
+    const byId = new Map(player.rack.map((t) => [t.id, t] as const));
+    const seen = new Set<string>();
+    const placements: Placement[] = [];
+    for (const move of moves) {
+      if (seen.has(move.tileId)) {
+        return { ok: false, error: `Duplicate tile id: ${move.tileId}` };
+      }
+      seen.add(move.tileId);
+      const tile = byId.get(move.tileId);
+      if (!tile) {
+        return { ok: false, error: `Tile not in rack: ${move.tileId}` };
+      }
+      const placedTile = move.assignedFace !== undefined ? assignTile(tile, move.assignedFace) : tile;
+      placements.push({ tile: placedTile, position: move.position });
+    }
+    const placed: Position[] = [];
+    try {
+      for (const p of placements) {
+        this.board.placeTile(p.position, p.tile);
+        placed.push(p.position);
+      }
+    } catch (e) {
+      for (const pos of placed) this.board.removeTile(pos);
+      return { ok: false, error: e instanceof Error ? e.message : "Failed to place tiles" };
+    }
+    const result = TurnManager.validateAndScorePlay(this.board, placements, this.isFirstMove);
+    for (const p of placements) this.board.removeTile(p.position);
+    if (!result.ok) return { ok: false, error: result.error };
+    return { ok: true, score: result.score.total };
+  }
+
   swap(tileIds: string[]): GameActionResult {
     if (this.phase !== "playing") {
       return { ok: false, error: "Game is not in playing phase" };
@@ -267,7 +321,7 @@ export class GameEngine {
     }
 
     this.consecutivePasses++;
-    if (this.consecutivePasses >= GAME_CONFIG.CONSECUTIVE_PASSES_LIMIT) {
+    if (this.consecutivePasses >= this.consecutivePassesLimit) {
       this.phase = "finished";
       this.turnNumber++;
       return {

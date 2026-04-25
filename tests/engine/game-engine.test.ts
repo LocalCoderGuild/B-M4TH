@@ -79,7 +79,7 @@ describe("GameEngine full game ending - Trigger A (bag empty + empty rack)", () 
 });
 
 describe("GameEngine full game ending - Trigger B (consecutive passes)", () => {
-  test("finishes after 3 consecutive passes", () => {
+  test("finishes after N (=players.length) consecutive passes (2-player)", () => {
     const engine = GameEngine.create(["p1", "p2"], { seed: "pass-seed" });
 
     const r1 = engine.pass();
@@ -88,15 +88,37 @@ describe("GameEngine full game ending - Trigger B (consecutive passes)", () => {
 
     const r2 = engine.pass();
     expect(r2.ok).toBe(true);
-    if (r2.ok) expect(r2.phase).toBe("playing");
+    if (r2.ok) expect(r2.phase).toBe("finished");
 
+    const state = engine.getState();
+    expect(state.phase).toBe("finished");
+    expect(state.consecutivePasses).toBe(2);
+    expect(state.turnNumber).toBe(3);
+  });
+
+  test("finishes after N (=players.length) consecutive passes (3-player)", () => {
+    const engine = GameEngine.create(["p1", "p2", "p3"], { seed: "pass-seed-3" });
+
+    expect(engine.pass().ok).toBe(true);
+    expect(engine.pass().ok).toBe(true);
     const r3 = engine.pass();
     expect(r3.ok).toBe(true);
     if (r3.ok) expect(r3.phase).toBe("finished");
 
     const state = engine.getState();
-    expect(state.phase).toBe("finished");
     expect(state.consecutivePasses).toBe(3);
-    expect(state.turnNumber).toBe(4);
+  });
+
+  test("explicit consecutivePassesLimit overrides default", () => {
+    const engine = GameEngine.create(["p1", "p2"], {
+      seed: "pass-seed",
+      consecutivePassesLimit: 4,
+    });
+    expect(engine.pass().ok).toBe(true);
+    expect(engine.pass().ok).toBe(true);
+    expect(engine.pass().ok).toBe(true);
+    const r4 = engine.pass();
+    if (r4.ok) expect(r4.phase).toBe("finished");
+    expect(engine.getState().consecutivePasses).toBe(4);
   });
 });
