@@ -14,9 +14,9 @@ cp deploy/docker/.env.example .env
 
 Edit `.env` values:
 
-- `PUBLIC_BASE_URL`: web URL users open (example: `http://203.0.113.10`)
+- `PUBLIC_BASE_URL`: web URL users open (example: `http://xxx.x.xxx.xx`)
 - `CLIENT_ORIGIN`: same as web origin
-- `VITE_SERVER_URL`: API URL used by frontend (example: `http://203.0.113.10:2567`)
+- `VITE_SERVER_URL`: API URL used by frontend (example: `http://xxx.x.xxx.xx:2567`)
 - optional host ports (`WEB_EXPOSE_PORT`, `API_EXPOSE_PORT`)
 
 ## 2) Build and run
@@ -60,4 +60,4 @@ What it does on push (`main`/`master`/`develop`/`dev`) and manual dispatch:
 
 ### Required GitHub Variables
 
-- `VITE_SERVER_URL` (example: `http://203.0.113.10:2567`, used at web image build time)
+- `VITE_SERVER_URL` (example: `http://xxx.x.xxx.xx:2567`, used at web image build time)
