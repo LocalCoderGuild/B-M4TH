@@ -78,6 +78,7 @@ jobs:
         run: cd apps/game && bun install --frozen-lockfile
 
       - name: Validate lock + scripts
+        working-directory: apps/game
         run: |
-          cd apps/game && bun run typecheck
-          cd apps/game && bun run ci:engine
+          bun run typecheck
+          bun run ci:engine
