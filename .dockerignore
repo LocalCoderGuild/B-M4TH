@@ -10,3 +10,8 @@ out
 logs
 *.log
 **/.DS_Store
+
+# Private planning docs (exclude from build context)
+todo.md
+rules.md
+stacks.md

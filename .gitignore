@@ -36,3 +36,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Codex / Claude local state
 .codex
 .claude
+
+# Local planning notes
+/todo.md
+/rules.md
+/stacks.md

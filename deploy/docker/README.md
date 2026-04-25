@@ -56,27 +56,8 @@ What it does on push (`main`/`master`/`develop`/`dev`) and manual dispatch:
 2. Builds and pushes:
    - `ghcr.io/<owner>/b-m4th-server:<sha>`
    - `ghcr.io/<owner>/b-m4th-web:<sha>`
-3. Deploys via SSH to your server using `deploy/docker/docker-compose.prod.yml`
-
-### Required GitHub Secrets
-
-- `DEPLOY_HOST` (server IP or hostname)
-- `DEPLOY_USER` (SSH user)
-- `DEPLOY_SSH_KEY` (private key content)
-- `DEPLOY_PORT` (optional, default `22`)
-- `GHCR_PULL_TOKEN` (optional, only if registry pull needs auth)
-- `GHCR_PULL_USER` (optional with `GHCR_PULL_TOKEN`, defaults to workflow actor)
+3. Stops after image push (no server deployment)
 
 ### Required GitHub Variables
 
-- `DEPLOY_PATH` (optional, default `/opt/b-m4th`)
-- `PUBLIC_BASE_URL` (example: `http://203.0.113.10`)
-- `CLIENT_ORIGIN` (same origin as public web URL)
 - `VITE_SERVER_URL` (example: `http://203.0.113.10:2567`, used at web image build time)
-- `WEB_EXPOSE_PORT` (optional, default `80`)
-- `API_EXPOSE_PORT` (optional, default `2567`)
-
-### Server requirements
-
-- Docker + Docker Compose plugin installed.
-- Deploy user can run `docker` commands.
