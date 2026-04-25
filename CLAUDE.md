@@ -71,7 +71,7 @@ Three-layer split:
 
 - **React** (`src/pages/`, `src/ui/`) — pages (Home, Invite, Match), rack, score panel, turn controls, blank-assignment modal. Mantine v9 for components.
 - **PixiJS** (`src/scene/board-scene.ts`) — 15×15 grid, premium-cell coloring, placed tiles (solid) vs pending (ghost), hover highlight. Redraws only on `turnNumber` change (not on every 20 fps clock patch) for performance.
-- **Colyseus client** (`src/net/colyseus.ts`) — single active `Room` ref, state projection into Zustand store, private rack stored out of the shared state. Reconnection token is stashed in **`sessionStorage`** (tab-scoped, not `localStorage`). `MatchPage` calls `tryReconnect()` on mount if no room is active.
+- **Colyseus client** (`src/net/colyseus.ts`) — single active `Room` ref, state projection into Zustand store, private rack stored out of the shared state. Reconnection token is stashed in **`localStorage`** (survives tab close). `MatchPage` calls `tryReconnect()` on mount if no room is active.
 
 **Drag-drop bridge:** `useMatchStore.drag` is a shared DnD state. React rack sets `drag.tileId` on `pointerdown`; the Pixi scene reports hover cell via callbacks; on `pointerup` over a cell the store commits a `PendingPlacement`. The React rack uses `touch-action: none` and pointer capture to work on mobile. Blank tiles open a modal via a DOM `CustomEvent` (`b-m4th:assign-blank`) so the placement completes once an assigned face is chosen.
 

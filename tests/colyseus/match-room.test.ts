@@ -12,7 +12,7 @@ let matches: MatchRegistry;
 
 beforeAll(async () => {
   invites = new InviteStore({ sweepIntervalMs: 0 });
-  matches = new MatchRegistry();
+  matches = new MatchRegistry({ sweepIntervalMs: 0 });
   const server = new Server({ transport: new WebSocketTransport({ server: undefined as any }) });
   server.define(MATCH_ROOM_NAME, MatchRoom, { invites, matches } as any);
   colyseus = await boot(server);
@@ -20,6 +20,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await colyseus.shutdown();
+  matches.dispose();
 });
 
 async function withMatch(hostName: string): Promise<{ matchId: string; seed: string; roomId: string; room: MatchRoom }> {
@@ -226,6 +227,7 @@ describe("MatchRoom integration", () => {
     expect(host.state.currentSessionId).not.toBe(firstPlayer);
     expect(host.state.consecutivePasses).toBe(1);
     expect(host.state.lastMove?.action).toBe("pass");
+    expect(host.state.lastMove?.sessionId).toBe(firstPlayer);
 
     void host.leave(true);
     void guest.leave(true);

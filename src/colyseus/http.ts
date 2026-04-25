@@ -169,6 +169,11 @@ export function createHttpApp(deps: HttpDeps): Express {
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("HTTP unhandled error:", err);
+    if (process.env.NODE_ENV === "production") {
+      res.status(500).json({ error: "Internal server error" });
+      return;
+    }
     res.status(500).json({ error: message });
   });
 

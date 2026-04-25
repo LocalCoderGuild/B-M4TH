@@ -6,7 +6,7 @@ import {
 } from "@entities";
 
 export type PhaseEnum = "waiting" | "playing" | "finished";
-export type SlotEnum = "host" | "guest";
+export type SlotEnum = "host" | "player";
 
 export class TileView extends Schema {
   @type("string") id: string = "";

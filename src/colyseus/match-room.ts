@@ -715,7 +715,12 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     }
     // Clock settlement for the player who just acted (client.sessionId).
     this.settleTurn(client.sessionId);
-    this.syncFromEngine({ action: ctx.action, scoreDelta: result.scoreDelta, placedPositions: ctx.placedPositions });
+    this.syncFromEngine({
+      action: ctx.action,
+      scoreDelta: result.scoreDelta,
+      placedPositions: ctx.placedPositions,
+      actorSessionId: client.sessionId,
+    });
 
     if (this.state.phase === "finished") {
       this.applyTriggerBAdjustmentIfNeeded();
@@ -768,6 +773,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     action: string;
     scoreDelta: number;
     placedPositions: Position[];
+    actorSessionId?: string;
   }): void {
     if (!this.engine) return;
     const snap = this.engine.getState();
@@ -804,7 +810,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     }
 
     const lastMove = new LastMoveView();
-    lastMove.sessionId = this.state.currentSessionId;
+    lastMove.sessionId = ctx.actorSessionId ?? this.state.currentSessionId;
     lastMove.action = ctx.action;
     lastMove.scoreDelta = ctx.scoreDelta;
     lastMove.turnNumber = snap.turnNumber;

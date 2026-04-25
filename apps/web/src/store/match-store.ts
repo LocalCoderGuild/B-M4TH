@@ -202,7 +202,7 @@ export const useMatchStore = create<MatchState>((set) => ({
   endDrag: () => set({ drag: emptyDrag }),
 
   setSwapMode: (mode) =>
-    set(() => ({ swapMode: mode, swapSelected: mode ? [] : [] })),
+    set(() => ({ swapMode: mode, swapSelected: [] })),
   toggleSwapPick: (tileId) =>
     set((s) => {
       const has = s.swapSelected.includes(tileId);

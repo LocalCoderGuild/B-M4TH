@@ -20,6 +20,7 @@ export interface MatchRecord {
 
 export interface MatchRegistryOptions {
   ttlMs?: number;
+  sweepIntervalMs?: number;
   now?: () => number;
 }
 export { DEFAULT_TIME_CONTROL, MAX_PLAYERS, MIN_PLAYERS };
@@ -37,10 +38,16 @@ export class MatchRegistry {
   private readonly matches = new Map<string, MatchRecord>();
   private readonly ttlMs: number;
   private readonly now: () => number;
+  private sweepTimer?: ReturnType<typeof setInterval>;
 
   constructor(opts: MatchRegistryOptions = {}) {
     this.ttlMs = opts.ttlMs ?? MATCH_TTL_MS;
     this.now = opts.now ?? Date.now;
+    const interval = opts.sweepIntervalMs ?? 5 * 60 * 1000;
+    if (interval > 0 && typeof setInterval === "function") {
+      this.sweepTimer = setInterval(() => this.sweep(), interval);
+      this.sweepTimer.unref?.();
+    }
   }
 
   create(
@@ -89,7 +96,24 @@ export class MatchRegistry {
     this.matches.delete(matchId);
   }
 
+  sweep(): number {
+    const cutoff = this.now();
+    let removed = 0;
+    for (const [matchId, record] of this.matches) {
+      if (cutoff - record.createdAt > this.ttlMs) {
+        this.matches.delete(matchId);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
   size(): number {
     return this.matches.size;
+  }
+
+  dispose(): void {
+    if (this.sweepTimer) clearInterval(this.sweepTimer);
+    this.matches.clear();
   }
 }
