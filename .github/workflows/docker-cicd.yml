@@ -89,12 +89,29 @@ jobs:
     name: Deploy to Server
     runs-on: ubuntu-latest
     needs: docker-build-push
-    if: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_USER != '' && secrets.DEPLOY_SSH_KEY != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Evaluate deploy prerequisites
+        id: deploy_gate
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -eu
+          if [ -n "$DEPLOY_HOST" ] && [ -n "$DEPLOY_USER" ] && [ -n "$DEPLOY_SSH_KEY" ]; then
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "Deploy prerequisites detected; deployment steps enabled."
+          else
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Deploy secrets are not fully configured. Skipping deploy steps."
+          fi
+
       - name: Ensure remote deploy directory
+        if: ${{ steps.deploy_gate.outputs.should_deploy == 'true' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -106,6 +123,7 @@ jobs:
             mkdir -p "${{ vars.DEPLOY_PATH || '/opt/b-m4th' }}"
 
       - name: Upload production compose file
+        if: ${{ steps.deploy_gate.outputs.should_deploy == 'true' }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -117,6 +135,7 @@ jobs:
           strip_components: 2
 
       - name: Pull and restart containers
+        if: ${{ steps.deploy_gate.outputs.should_deploy == 'true' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
