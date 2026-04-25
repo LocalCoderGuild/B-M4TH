@@ -46,12 +46,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set image refs
-        id: image_refs
+      - name: Set image owner
+        id: image_owner
         run: |
           OWNER_LC="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          echo "server_image=ghcr.io/${OWNER_LC}/b-m4th-server:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "web_image=ghcr.io/${OWNER_LC}/b-m4th-web:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "owner_lc=${OWNER_LC}" >> "$GITHUB_OUTPUT"
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -63,14 +62,32 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Docker metadata (server)
+        id: server_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.image_owner.outputs.owner_lc }}/b-m4th-server
+          tags: |
+            type=sha
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' || github.ref_name == 'master' }}
+
       - name: Build and push server image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: deploy/docker/server.Dockerfile
           push: true
+          tags: ${{ steps.server_meta.outputs.tags }}
+          labels: ${{ steps.server_meta.outputs.labels }}
+
+      - name: Docker metadata (web)
+        id: web_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.image_owner.outputs.owner_lc }}/b-m4th-web
           tags: |
-            ${{ steps.image_refs.outputs.server_image }}
+            type=sha
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' || github.ref_name == 'master' }}
 
       - name: Build and push web image
         uses: docker/build-push-action@v6
@@ -80,5 +97,5 @@ jobs:
           push: true
           build-args: |
             VITE_SERVER_URL=${{ vars.VITE_SERVER_URL || 'http://localhost:2567' }}
-          tags: |
-            ${{ steps.image_refs.outputs.web_image }}
+          tags: ${{ steps.web_meta.outputs.tags }}
+          labels: ${{ steps.web_meta.outputs.labels }}

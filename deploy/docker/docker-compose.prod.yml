@@ -1,6 +1,6 @@
 services:
   server:
-    image: ${SERVER_IMAGE:?SERVER_IMAGE is required}
+    image: ${SERVER_IMAGE:-ghcr.io/siraphat-ohm/b-m4th-server:latest}
     restart: unless-stopped
     environment:
       PORT: "2567"
@@ -10,7 +10,7 @@ services:
       - "${API_EXPOSE_PORT:-2567}:2567"
 
   web:
-    image: ${WEB_IMAGE:?WEB_IMAGE is required}
+    image: ${WEB_IMAGE:-ghcr.io/siraphat-ohm/b-m4th-web:latest}
     restart: unless-stopped
     depends_on:
       - server

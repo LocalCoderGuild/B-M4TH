@@ -5,7 +5,7 @@ This setup runs:
 - `web` on host port `80` (nginx serving built `apps/web/dist`)
 - `server` on host port `2567` (Colyseus + API)
 
-## 1) Prepare env
+## 1) Prepare env (build locally)
 
 ```bash
 cd /home/simon/Documents/Projects/B-M4TH
@@ -54,10 +54,44 @@ What it does on push (`main`/`master`/`develop`/`dev`) and manual dispatch:
 
 1. Runs quality gate (`typecheck` + `ci:engine`)
 2. Builds and pushes:
-   - `ghcr.io/<owner>/b-m4th-server:<sha>`
-   - `ghcr.io/<owner>/b-m4th-web:<sha>`
+   - `ghcr.io/<owner>/b-m4th-server:sha-<sha>`
+   - `ghcr.io/<owner>/b-m4th-web:sha-<sha>`
+   - `latest` tags on `main`/`master` only
 3. Stops after image push (no server deployment)
 
 ### Required GitHub Variables
 
 - `VITE_SERVER_URL` (example: `http://xxx.x.xxx.xx:2567`, used at web image build time)
+
+### Make images publicly pullable (one-time)
+
+In GitHub UI:
+1. Open package `b-m4th-server` under your profile/org Packages.
+2. Set visibility to `Public`.
+3. Repeat for `b-m4th-web`.
+
+Or with `gh` CLI:
+
+```bash
+gh api -X PATCH /user/packages/container/b-m4th-server/visibility -f visibility=public
+gh api -X PATCH /user/packages/container/b-m4th-web/visibility -f visibility=public
+```
+
+For org-owned repos, replace `/user/packages/...` with `/orgs/<org>/packages/...`.
+
+## Deploy on your own server from public images
+
+```bash
+cd /path/to/B-M4TH
+cp deploy/docker/.env.public.example .env.public
+# edit PUBLIC_BASE_URL / CLIENT_ORIGIN (and optional SERVER_IMAGE/WEB_IMAGE overrides)
+docker compose -f deploy/docker/docker-compose.prod.yml --env-file .env.public pull
+docker compose -f deploy/docker/docker-compose.prod.yml --env-file .env.public up -d
+```
+
+Verify:
+
+```bash
+docker compose -f deploy/docker/docker-compose.prod.yml --env-file .env.public ps
+curl http://127.0.0.1:2567/api/health
+```
