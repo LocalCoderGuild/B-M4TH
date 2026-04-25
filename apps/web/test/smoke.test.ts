@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const WEB_DIR = join(import.meta.dir, "..", "..", "apps", "web");
+const WEB_DIR = join(import.meta.dir, "..");
 
 describe("web client scaffold", () => {
   test("package.json declares the expected runtime stack", async () => {

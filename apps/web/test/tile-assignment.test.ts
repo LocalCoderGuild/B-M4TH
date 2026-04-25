@@ -4,7 +4,7 @@ import {
   getAssignmentGroups,
   getAssignmentTitle,
   needsAssignment,
-} from "../../apps/web/src/ui/tile-assignment";
+} from "../src/ui/tile-assignment";
 
 describe("tile assignment helpers", () => {
   test("blank tiles expose number and operator choices", () => {
