@@ -69,3 +69,33 @@
 - [x] Final scoring adjustments (opponent tile values × 2)
 - [ ] Chess clock integration hooks (time bank tracking)
 - [x] Tests: full game simulation, endgame triggers, score adjustments
+
+## Step 9: Colyseus Backend Scaffold + Tests ✅
+
+- [x] Add `src/colyseus/` room/state/server placeholders
+- [x] Keep engine rules authoritative on the server side
+- [x] Add `tests/colyseus/` room smoke test
+- [x] Document Colyseus backend role vs frontend client role
+
+## Step 10: Frontend Scaffold (React + PixiJS) + Tests ✅
+
+- [x] Add `apps/web/` workspace with Vite + React
+- [x] Add PixiJS board canvas placeholder
+- [x] Add React lobby/score/turn panels
+- [x] Add `tests/web/` smoke test
+- [x] Document recommended stack in `stacks.md`
+
+## Step 11: Frontend Architecture + Migration Docs ✅
+
+- [x] Add `docs/frontend-architecture.md`
+- [x] Add `docs/colyseus-frontend-pipeline.md`
+- [x] Keep server, renderer, and UI responsibilities separated
+- [x] Define folder layout for `apps/web/`, `src/colyseus/`, `tests/web/`, and `tests/colyseus/`
+
+## Step 12: Colyseus-to-Frontend Integration
+
+- [ ] Connect `apps/web` to the Colyseus room
+- [ ] Map room state into React HUD state
+- [ ] Render live board state in PixiJS instead of placeholder graphics
+- [ ] Add turn actions: play, swap, pass, reconnect
+- [ ] Add gameplay sync tests for room join, state updates, and disconnect recovery
