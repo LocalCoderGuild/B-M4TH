@@ -100,22 +100,40 @@ export function evaluate(tokens: Token[]): boolean {
   }, []);
 
   if (eqIndices.length === 0) throw new EvaluatorError("No equals sign in equation");
-  if (eqIndices.length > 1) throw new EvaluatorError("Multiple equals signs in equation");
 
-  const eqIdx = eqIndices[0]!;
-  const leftTokens = tokens.slice(0, eqIdx);
-  const rightTokens = tokens.slice(eqIdx + 1);
+  // Split tokens into segments at each = sign (supports chain equations: a = b = c)
+  const segments: Token[][] = [];
+  let prev = 0;
+  for (const idx of eqIndices) {
+    segments.push(tokens.slice(prev, idx));
+    prev = idx + 1;
+  }
+  segments.push(tokens.slice(prev));
 
-  if (leftTokens.length === 0) throw new EvaluatorError("Empty left side of equation");
-  if (rightTokens.length === 0) throw new EvaluatorError("Empty right side of equation");
+  let referenceValue: number | null = null;
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]!;
+    if (seg.length === 0) {
+      throw new EvaluatorError(
+        i === 0 ? "Empty left side of equation" :
+        i === segments.length - 1 ? "Empty right side of equation" :
+        "Empty expression between equals signs",
+      );
+    }
+    const parser = new Parser(seg);
+    const ast = parser.parseExpr();
+    if (!parser.isAtEnd()) {
+      throw new EvaluatorError(
+        i === 0 ? "Unexpected tokens on left side" : "Unexpected tokens in expression",
+      );
+    }
+    const value = evalAST(ast);
+    if (referenceValue === null) {
+      referenceValue = value;
+    } else if (value !== referenceValue) {
+      return false;
+    }
+  }
 
-  const lp = new Parser(leftTokens);
-  const leftAST = lp.parseExpr();
-  if (!lp.isAtEnd()) throw new EvaluatorError("Unexpected tokens on left side");
-
-  const rp = new Parser(rightTokens);
-  const rightAST = rp.parseExpr();
-  if (!rp.isAtEnd()) throw new EvaluatorError("Unexpected tokens on right side");
-
-  return evalAST(leftAST) === evalAST(rightAST);
+  return true;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { lex } from "@engine/lexer";
+import { lex, LexError } from "@engine/lexer";
 import { evaluate, EvaluatorError } from "@engine/evaluator";
 
 function eq(faces: string[]): boolean {
@@ -112,13 +112,35 @@ describe("evaluate - unary minus", () => {
   });
 });
 
+describe("evaluate - chain equations", () => {
+  test("-10 + 9 = -1 = -10 ÷ 10 is true", () => {
+    expect(eq(["-", "1", "0", "+", "9", "=", "-", "1", "=", "-", "1", "0", "÷", "1", "0"])).toBe(true);
+  });
+
+  test("5 = 5 = 5 is true", () => {
+    expect(eq(["5", "=", "5", "=", "5"])).toBe(true);
+  });
+
+  test("2 + 3 = 10 ÷ 2 = 5 is true", () => {
+    expect(eq(["2", "+", "3", "=", "10", "÷", "2", "=", "5"])).toBe(true);
+  });
+
+  test("1 = 1 = 2 is false (segments disagree)", () => {
+    expect(eq(["1", "=", "1", "=", "2"])).toBe(false);
+  });
+
+  test("adjacent equals signs throw EvaluatorError (empty segment)", () => {
+    expect(() => eq(["1", "=", "=", "1"])).toThrow(EvaluatorError);
+  });
+});
+
 describe("evaluate - structural errors", () => {
   test("no equals sign throws EvaluatorError", () => {
     expect(() => evaluate([{ type: "number", value: 5 }])).toThrow(EvaluatorError);
   });
 
-  test("multiple equals signs throws EvaluatorError", () => {
-    expect(() => eq(["1", "=", "1", "=", "1"])).toThrow(EvaluatorError);
+  test("chain equation 1 = 1 = 1 is true", () => {
+    expect(eq(["1", "=", "1", "=", "1"])).toBe(true);
   });
 
   test("empty left side throws EvaluatorError", () => {
@@ -147,8 +169,8 @@ describe("evaluate - stress: large numbers from concatenation", () => {
     expect(eq(["1", "2", "3", "+", "4", "5", "6", "=", "5", "7", "9"])).toBe(true);
   });
 
-  test("999 + 1 = 1000", () => {
-    expect(eq(["9", "9", "9", "+", "1", "=", "1", "0", "0", "0"])).toBe(true);
+  test("999 + 1 = 1000 throws LexError (4-digit concatenation exceeds limit)", () => {
+    expect(() => eq(["9", "9", "9", "+", "1", "=", "1", "0", "0", "0"])).toThrow(LexError);
   });
 
   test("100 - 1 = 99", () => {
@@ -159,8 +181,8 @@ describe("evaluate - stress: large numbers from concatenation", () => {
     expect(eq(["5", "0", "×", "2", "=", "1", "0", "0"])).toBe(true);
   });
 
-  test("1000 ÷ 8 = 125", () => {
-    expect(eq(["1", "0", "0", "0", "÷", "8", "=", "1", "2", "5"])).toBe(true);
+  test("1000 ÷ 8 = 125 throws LexError (4-digit concatenation exceeds limit)", () => {
+    expect(() => eq(["1", "0", "0", "0", "÷", "8", "=", "1", "2", "5"])).toThrow(LexError);
   });
 
   test("9 × 9 = 81", () => {
@@ -337,8 +359,8 @@ describe("evaluate - stress: false equations", () => {
 });
 
 describe("evaluate - stress: more error cases", () => {
-  test("triple equals throws", () => {
-    expect(() => eq(["1", "=", "1", "=", "1", "=", "1"])).toThrow(EvaluatorError);
+  test("chain equation 1 = 1 = 1 = 1 is true", () => {
+    expect(eq(["1", "=", "1", "=", "1", "=", "1"])).toBe(true);
   });
 
   test("only equals throws", () => {

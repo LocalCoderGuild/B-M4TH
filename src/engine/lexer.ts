@@ -27,6 +27,11 @@ export function lex(faces: string[]): Token[] {
           `Single-digit tile "${face}" cannot be placed adjacent to a multi-digit tile`,
         );
       }
+      if (numBuffer.length >= 3) {
+        throw new LexError(
+          `Number too long: concatenated digits cannot exceed 3 digits ("${numBuffer}${face}")`,
+        );
+      }
       numBuffer += face;
     } else if (MULTI_DIGIT_RE.test(face)) {
       // multi-digit tile: must stand alone — no adjacent number tiles on either side
@@ -45,6 +50,9 @@ export function lex(faces: string[]): Token[] {
     } else {
       // operator or equals: flush single-digit buffer first
       if (numBuffer !== "") {
+        if (numBuffer.length > 1 && numBuffer[0] === "0") {
+          throw new LexError(`Multi-digit number cannot have a leading zero: "${numBuffer}"`);
+        }
         tokens.push({ type: "number", value: parseInt(numBuffer, 10) });
         numBuffer = "";
       }
@@ -60,6 +68,9 @@ export function lex(faces: string[]): Token[] {
   }
 
   if (numBuffer !== "") {
+    if (numBuffer.length > 1 && numBuffer[0] === "0") {
+      throw new LexError(`Multi-digit number cannot have a leading zero: "${numBuffer}"`);
+    }
     tokens.push({ type: "number", value: parseInt(numBuffer, 10) });
   }
 

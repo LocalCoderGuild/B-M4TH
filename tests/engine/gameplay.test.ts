@@ -153,21 +153,20 @@ describe("7-turn gameplay simulation with player scores", () => {
     }
   });
 
-  test("Turn 6 — invalid extension is rejected and scores do not change", () => {
-    // Extending col 5 creates: 4 - 1 = 3 = 3 (invalid: multiple equals)
-    const p1Before = p1Score;
-    const p2Before = p2Score;
+  test("Turn 6 — valid chain extension: 4 - 1 = 3 = 3", () => {
+    // Extending col 5 creates the chain equation 4 - 1 = 3 = 3 (all segments equal 3)
     const ps = play(board, [
       { face: "=", row: 12, col: 5 },
       { face: "3", row: 13, col: 5 },
     ], false);
 
     const result = TurnManager.validateAndScorePlay(board, ps, false);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toMatch(/multiple equals|unexpected|invalid equation/i);
-      expect(p1Score).toBe(p1Before);
-      expect(p2Score).toBe(p2Before);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.equations).toHaveLength(1);
+      expect(result.equations[0]!.faces).toEqual(["4", "-", "1", "=", "3", "=", "3"]);
+      p2Score += result.score.total;
+      turnScores.push(result.score.total);
     }
   });
 
@@ -190,7 +189,7 @@ describe("7-turn gameplay simulation with player scores", () => {
 
   test("score totals are accumulated correctly across players", () => {
     const total = turnScores.reduce((acc, n) => acc + n, 0);
-    expect(turnScores).toHaveLength(6);
+    expect(turnScores).toHaveLength(7);
     expect(p1Score + p2Score).toBe(total);
     expect(p1Score).toBeGreaterThan(0);
     expect(p2Score).toBeGreaterThan(0);
