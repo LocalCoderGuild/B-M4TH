@@ -3,11 +3,13 @@ services:
     image: ${SERVER_IMAGE:-ghcr.io/siraphat-ohm/b-m4th-server:latest}
     restart: unless-stopped
     environment:
-      PORT: "2567"
+      ENGINE_PORT: "2567"
+      API_PORT: "2566"
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       CLIENT_ORIGIN: ${CLIENT_ORIGIN}
     ports:
-      - "${API_EXPOSE_PORT:-2567}:2567"
+      - "${ENGINE_EXPOSE_PORT:-2567}:2567"
+      - "${API_EXPOSE_PORT:-2566}:2566"
 
   web:
     image: ${WEB_IMAGE:-ghcr.io/siraphat-ohm/b-m4th-web:latest}
