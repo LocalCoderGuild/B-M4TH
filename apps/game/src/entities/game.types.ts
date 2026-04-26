@@ -15,4 +15,5 @@ export interface GameState {
   turnNumber: number;
   isFirstMove: boolean;
   startPosition: Position;
+  mode: string;
 }

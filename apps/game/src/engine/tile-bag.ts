@@ -1,5 +1,5 @@
 import type { Tile, TileConfig, BlankAssignment } from "@entities";
-import { VALID_BLANK_ASSIGNMENTS, GAME_CONFIG, PLUS_MINUS_OPTIONS, MUL_DIV_OPTIONS, TILE_CONFIGS } from "@entities";
+import { VALID_BLANK_ASSIGNMENTS, PLUS_MINUS_OPTIONS, MUL_DIV_OPTIONS, TILE_CONFIGS, CLASSIC_MODE } from "@entities";
 import { randomUUID } from "crypto";
 import seedrandom from "seedrandom";
 
@@ -34,25 +34,34 @@ const ASSIGNMENT_VALIDATORS: Partial<Record<string, readonly string[]>> = {
 
 export class TileBag {
   private stack: Tile[];
+  private readonly swapBagMinimum: number;
 
-  private constructor(stack: Tile[]) {
+  private constructor(stack: Tile[], swapBagMinimum: number) {
     this.stack = stack;
+    this.swapBagMinimum = swapBagMinimum;
   }
 
-  static create(seed: number | string = Date.now()): TileBag {
+  static create(
+    seed: number | string = Date.now(),
+    tileConfigs: TileConfig[] = CLASSIC_MODE.tileConfigs,
+    swapBagMinimum: number = CLASSIC_MODE.swapBagMinimum
+  ): TileBag {
     const tiles: Tile[] = [];
-    for (const config of TILE_CONFIGS) {
+    for (const config of tileConfigs) {
       for (let i = 0; i < config.count; i++) {
         tiles.push(createTile(config));
       }
     }
     const rng = seedrandom(String(seed));
     const shuffled = shuffle(tiles, rng);
-    return new TileBag(shuffled);
+    return new TileBag(shuffled, swapBagMinimum);
   }
 
-  static fromTiles(tiles: Tile[]): TileBag {
-    return new TileBag([...tiles]);
+  static fromTiles(
+    tiles: Tile[],
+    swapBagMinimum: number = CLASSIC_MODE.swapBagMinimum
+  ): TileBag {
+    return new TileBag([...tiles], swapBagMinimum);
   }
 
   draw(count: number): Tile[] {
@@ -77,7 +86,7 @@ export class TileBag {
   }
 
   canSwap(): boolean {
-    return this.stack.length > GAME_CONFIG.SWAP_BAG_MINIMUM;
+    return this.stack.length > this.swapBagMinimum;
   }
 
   get size(): number {

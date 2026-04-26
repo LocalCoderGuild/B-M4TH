@@ -1,8 +1,9 @@
 import type { Placement, PremiumType, Position } from "@entities";
-import { GAME_CONFIG } from "@entities";
 import type { ScannedEquation } from "./board-scanner";
 import { Board } from "./board";
 import { posKey } from "./pos-key";
+
+import { CLASSIC_MODE } from "@entities";
 
 export interface TileScoreDetail {
   position: Position;
@@ -35,6 +36,8 @@ export class Scorer {
     board: Board,
     placements: Placement[],
     equations: ScannedEquation[],
+    rackSize: number = CLASSIC_MODE.rackSize,
+    bingoBonusAmount: number = CLASSIC_MODE.bingoBonus,
   ): TurnScoreBreakdown {
     const placed = new Set(
       placements.map((p) => posKey(p.position.row, p.position.col)),
@@ -87,7 +90,7 @@ export class Scorer {
     const equationScores = equationDetails.map((d) => d.total);
 
     const bingoBonus =
-      placements.length === GAME_CONFIG.RACK_SIZE ? GAME_CONFIG.BINGO_BONUS : 0;
+      placements.length === rackSize ? bingoBonusAmount : 0;
     const total =
       equationScores.reduce((acc, score) => acc + score, 0) + bingoBonus;
 

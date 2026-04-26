@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Board } from "@engine/board";
 import { TurnManager } from "@engine/turn-manager";
-import type { Placement } from "@entities";
+import { type Placement, CLASSIC_MODE } from "@entities";
 import { makeTile } from "../helpers/make-tile";
 
 let tileCounter = 0;
@@ -314,7 +314,7 @@ describe("advanced gameplay scenarios", () => {
   });
 
   test("premium-heavy opening with custom start position applies compound multipliers", () => {
-    const board = Board.create({ row: 0, col: 3 });
+    const board = Board.create(CLASSIC_MODE.boardSize, { row: 0, col: 3 });
     printAdvancedBoard(board, "Initial board — scenario 2 (custom start)");
 
     // Row 0 has premium hotspots: col0=3x_eq, col3=2x_piece, col7=3x_eq.

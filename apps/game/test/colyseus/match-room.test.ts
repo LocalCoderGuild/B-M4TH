@@ -302,8 +302,8 @@ describe("MatchRoom integration", () => {
 
     const firstPlayer = host.state.currentSessionId;
     const currentClient = firstPlayer === host.sessionId ? host : guest;
-    const roomImpl = colyseus.getRoomById(roomId) as MatchRoom & { turnStartedAt: number | null };
-    roomImpl.turnStartedAt = Date.now() - 121_000;
+    const roomImpl = colyseus.getRoomById(roomId) as MatchRoom & { matchSession: any };
+    roomImpl.matchSession.matchClock.turnStartedAt = Date.now() - 121_000;
 
     await new Promise((r) => setTimeout(r, 600));
     currentClient.send("pass", {});

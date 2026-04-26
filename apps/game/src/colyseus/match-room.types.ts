@@ -15,7 +15,4 @@ export interface SeatRecord {
   seatIndex: number;
   name: string;
   connected: boolean;
-  bankRemainingMs: number;
-  overtimePenalty: number;
-  penaltyScoreTotal: number;
 }

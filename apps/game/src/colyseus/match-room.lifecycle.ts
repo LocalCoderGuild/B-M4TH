@@ -15,11 +15,6 @@ export interface LifecyclePlayerView {
   score: number;
 }
 
-export interface TriggerBPlayer {
-  id: string;
-  rack: Array<{ value: number }>;
-}
-
 export interface WinnerCandidate {
   sessionId: string;
   score: number;
@@ -76,22 +71,6 @@ export function settleTurnState(params: {
     overtimePenalty: penalty,
     penaltyDelta: penalty,
   };
-}
-
-export function calculateTriggerBBonuses(players: TriggerBPlayer[]): Map<string, number> {
-  const rackValueById = new Map<string, number>();
-  for (const p of players) {
-    rackValueById.set(p.id, p.rack.reduce((sum, t) => sum + t.value, 0));
-  }
-  let totalRackValue = 0;
-  for (const v of rackValueById.values()) totalRackValue += v;
-
-  const bonuses = new Map<string, number>();
-  for (const p of players) {
-    const othersRackValue = totalRackValue - (rackValueById.get(p.id) ?? 0);
-    bonuses.set(p.id, othersRackValue * 2);
-  }
-  return bonuses;
 }
 
 export function pickWinnerSessionId(players: WinnerCandidate[]): string {

@@ -1,6 +1,6 @@
 import { ArraySchema } from "@colyseus/schema";
-import type { TimeControl } from "@entities";
-import { GAME_CONFIG } from "@entities";
+import type { TimeControl, GameMode } from "@entities";
+import { CLASSIC_MODE } from "@entities";
 import { CellView, MatchStateSchema, PlayerView } from "./schema";
 
 export function createInitialMatchState(input: {
@@ -9,12 +9,14 @@ export function createInitialMatchState(input: {
   maxPlayers: number;
   minPlayers: number;
   nowMs: number;
+  mode?: GameMode;
 }): MatchStateSchema {
   const state = new MatchStateSchema();
+  const mode = input.mode ?? CLASSIC_MODE;
   state.matchId = input.matchId;
   state.phase = "waiting";
   state.ready = false;
-  state.boardSize = GAME_CONFIG.BOARD_SIZE;
+  state.boardSize = mode.boardSize;
   state.board = new ArraySchema<CellView>();
   state.players = new ArraySchema<PlayerView>();
   state.serverTime = input.nowMs;

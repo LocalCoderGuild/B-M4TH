@@ -74,7 +74,6 @@ export function createSeatRecord(input: {
   role: "host" | "player";
   seatIndex: number;
   name: string;
-  bankRemainingMs: number;
 }): SeatRecord {
   return {
     sessionId: input.sessionId,
@@ -82,8 +81,5 @@ export function createSeatRecord(input: {
     seatIndex: input.seatIndex,
     name: input.name,
     connected: true,
-    bankRemainingMs: input.bankRemainingMs,
-    overtimePenalty: 0,
-    penaltyScoreTotal: 0,
   };
 }

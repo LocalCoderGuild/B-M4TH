@@ -5,7 +5,6 @@ import { GameEngine, type GameActionResult } from "@engine/game-engine";
 import { type BoardCell, type Tile, type Position, type BlankAssignment, type TimeControl } from "@entities";
 import {
   DEFAULT_TIME_CONTROL,
-  GAME_CONFIG,
   MAX_PLAYERS,
   MIN_PLAYERS,
 } from "@entities";
@@ -54,7 +53,6 @@ import {
 } from "./match-room.config";
 import { previewPenalty, tilesToClient } from "./match-room.helpers";
 import {
-  calculateTriggerBBonuses,
   pickWinnerSessionId,
   settleTurnState,
   syncSeatBanks,
@@ -66,6 +64,9 @@ import {
   PlayerView,
 } from "./schema";
 
+import { MatchSession } from "./domain/match-session";
+import { MatchClock } from "./domain/match-clock";
+
 const roomLog = createLogger("colyseus.MatchRoom");
 
 export class MatchRoom extends Room<{ state: MatchStateSchema }> {
@@ -73,14 +74,13 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   private seed: string = "";
   private invites!: InviteStore;
   private matches!: MatchRegistry;
-  private engine: GameEngine | null = null;
+  private matchSession!: MatchSession;
   private seats = new Map<string, SeatRecord>();
   private lastActionAt = new Map<string, number>();
   private lastRackRecoveryAt = new Map<string, number>();
   private lastPendingUpdateAt = new Map<string, number>();
   private seatReservationTimeoutSeconds: number = MATCH_ROOM_DEFAULTS.seatReservationTimeoutSeconds;
   private clockTickIntervalMs: number = MATCH_ROOM_DEFAULTS.clockTickIntervalMs;
-  private turnStartedAt: number | null = null;
   private clockTickHandle: { clear: () => void } | null = null;
 
   private nowMs(): number {
@@ -115,6 +115,8 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     );
     const minPlayers = Math.max(MIN_PLAYERS, record?.minPlayers ?? MIN_PLAYERS);
     this.maxClients = maxPlayers;
+    
+    this.matchSession = new MatchSession(new MatchClock(tc), this.seed);
 
     roomLog("onCreate", {
       roomId: this.roomId,
@@ -184,15 +186,16 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       ready: this.state.ready,
     });
 
-    const bankMs = minutesToMs(this.state.baseMinutes);
     const seat: SeatRecord = createSeatRecord({
       sessionId: client.sessionId,
       role,
       seatIndex,
       name,
-      bankRemainingMs: bankMs,
     });
     this.seats.set(client.sessionId, seat);
+
+    this.matchSession.matchClock.addPlayer(client.sessionId);
+    const clockState = this.matchSession.matchClock.getPlayerState(client.sessionId)!;
 
     const view = this.playerViewForSession(client.sessionId) ?? new PlayerView();
     view.sessionId = client.sessionId;
@@ -200,8 +203,8 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     view.slot = role;
     view.seatIndex = seatIndex;
     view.connected = true;
-    view.bankRemainingMs = seat.bankRemainingMs;
-    view.overtimePenalty = 0;
+    view.bankRemainingMs = clockState.bankRemainingMs;
+    view.overtimePenalty = clockState.overtimePenalty;
     if (!view.color) {
       view.color = pickFirstAvailableColor(this.state.players, client.sessionId, seatIndex);
     }
@@ -255,8 +258,9 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     if (!parsed.success) return;
 
     // Only the current player's pending moves are meaningful.
-    if (!this.engine || this.state.phase !== "playing") return;
-    if (this.engine.getState().currentPlayerId !== client.sessionId) return;
+    const engine = this.matchSession.getEngine();
+    if (!engine || this.state.phase !== "playing") return;
+    if (engine.getState().currentPlayerId !== client.sessionId) return;
 
     const moves = parsed.data.moves;
 
@@ -269,7 +273,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       client.send("previewScore", { valid: false });
       return;
     }
-    const previewResult = this.engine.previewPlay(toPreviewPlayMoves(moves));
+    const previewResult = engine.previewPlay(toPreviewPlayMoves(moves));
     if (previewResult.ok) {
       client.send("previewScore", { valid: true, score: previewResult.score });
     } else {
@@ -314,10 +318,18 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     this.state.incrementSeconds = tc.incrementSeconds;
     this.state.turnMinutes = tc.turnMinutes;
     this.matches?.updateTimeControl(this.matchId, tc);
+    this.matchSession.matchClock.updateTimeControl(tc);
+    this.matchSession.matchClock.resetAllBanks();
 
     // Reset pre-start bank previews on all joined seats.
-    const bankMs = minutesToMs(tc.baseMinutes);
-    syncSeatBanks(this.seats.values(), (id) => this.playerViewForSession(id), bankMs, false);
+    for (const state of this.matchSession.matchClock.getAllPlayers()) {
+      const view = this.playerViewForSession(state.sessionId);
+      if (view) {
+        view.bankRemainingMs = state.bankRemainingMs;
+        view.turnElapsedMs = state.turnElapsedMs;
+        view.overtimePenalty = state.overtimePenalty;
+      }
+    }
   }
 
   override async onLeave(client: Client, code?: number): Promise<void> {
@@ -377,15 +389,23 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   private startGame(): void {
     this.state.ready = false;
     this.state.started = true;
-    const bankMs = minutesToMs(this.state.baseMinutes);
-    syncSeatBanks(this.seats.values(), (id) => this.playerViewForSession(id), bankMs, true);
+    
     const ordered = [...this.state.players].sort((a, b) => a.seatIndex - b.seatIndex);
     const playerIds = ordered.map((p) => p.sessionId);
-    this.engine = GameEngine.create(playerIds, {
-      seed: this.seed,
-      consecutivePassesLimit: playerIds.length,
-    });
-    this.turnStartedAt = this.nowMs();
+    
+    this.matchSession.start(playerIds);
+    this.matchSession.startTurn(this.nowMs());
+    
+    for (const state of this.matchSession.matchClock.getAllPlayers()) {
+      const view = this.playerViewForSession(state.sessionId);
+      if (view) {
+        view.bankRemainingMs = state.bankRemainingMs;
+        view.turnElapsedMs = state.turnElapsedMs;
+        view.overtimePenalty = state.overtimePenalty;
+        view.score = 0; // Ensure clean state if necessary, though engine syncs it.
+      }
+    }
+
     this.syncFromEngine({ action: "start", scoreDelta: 0, placedPositions: [] });
     this.state.ready = this.state.board.length === this.state.boardSize * this.state.boardSize;
     roomLog("startGame", {
@@ -419,46 +439,26 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   }
 
   private onClockTick(): void {
-    if (!this.engine || this.state.phase !== "playing" || this.turnStartedAt === null) return;
+    const engine = this.matchSession.getEngine();
+    if (!engine || this.state.phase !== "playing") return;
     const currentId = this.state.currentSessionId;
+    this.matchSession.tick(this.nowMs());
+    
+    const state = this.matchSession.matchClock.getPlayerState(currentId);
     const view = this.playerViewForSession(currentId);
-    if (!view) return;
-    const elapsed = this.nowMs() - this.turnStartedAt;
-    view.turnElapsedMs = elapsed;
-    // Overage-only penalty preview (not yet applied — applied on settle).
-    const allowed = Math.min(minutesToMs(this.state.turnMinutes), view.bankRemainingMs);
-    const overage = Math.max(0, elapsed - allowed);
-    view.overtimePenalty = previewPenalty(overage);
+    if (state && view) {
+      view.turnElapsedMs = state.turnElapsedMs;
+      view.overtimePenalty = state.overtimePenalty;
+    }
   }
 
-  /** Settle the outgoing player's clock at turn transition:
-   *  - Deduct elapsed from bank (floor at 0).
-   *  - Apply overtime penalty (score -= penalty) if elapsed > allowed.
-   *  - Return to a clean state for the next player. */
-  private settleTurn(outgoingSessionId: string): void {
-    if (this.turnStartedAt === null) return;
-    const view = this.playerViewForSession(outgoingSessionId);
-    const seat = this.seats.get(outgoingSessionId);
-    if (!view || !seat) return;
-
-    const elapsed = this.nowMs() - this.turnStartedAt;
-    const settled = settleTurnState({
-      bankBeforeMs: view.bankRemainingMs,
-      elapsedMs: elapsed,
-      turnMinutes: this.state.turnMinutes,
-      incrementSeconds: this.state.incrementSeconds,
-      previewPenalty,
-    });
-
-    view.bankRemainingMs = settled.bankRemainingMs;
-    view.turnElapsedMs = 0;
-    if (settled.penaltyDelta > 0) {
-      seat.penaltyScoreTotal += settled.penaltyDelta;
-      seat.overtimePenalty = settled.overtimePenalty;
-      view.overtimePenalty = settled.overtimePenalty;
-    } else {
-      seat.overtimePenalty = 0;
-      view.overtimePenalty = 0;
+  private syncClockView(sessionId: string): void {
+    const state = this.matchSession.matchClock.getPlayerState(sessionId);
+    const view = this.playerViewForSession(sessionId);
+    if (state && view) {
+      view.bankRemainingMs = state.bankRemainingMs;
+      view.turnElapsedMs = state.turnElapsedMs;
+      view.overtimePenalty = state.overtimePenalty;
     }
   }
 
@@ -476,19 +476,20 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       this.sendError(client, invalidCode, result.error.issues[0]?.message ?? invalidMsg);
       return;
     }
-    if (!this.engine) {
+    const engine = this.matchSession.getEngine();
+    if (!engine) {
       this.sendError(client, "not_ready", "Game has not started yet");
       return;
     }
-    if (this.engine.getState().currentPlayerId !== client.sessionId) {
+    if (engine.getState().currentPlayerId !== client.sessionId) {
       this.sendError(client, "not_your_turn", "It is not your turn");
       return;
     }
-    fn(result.data, this.engine);
+    fn(result.data, engine);
   }
 
   private handlePlay(client: Client, rawPayload: unknown): void {
-    this.withActionGuard(client, playMessageSchema, rawPayload, "invalid_play", "Invalid play", (data, engine) => {
+    this.withActionGuard(client, playMessageSchema, rawPayload, "invalid_play", "Invalid play", (data) => {
       const moves = toEnginePlayMoves(data.moves);
       const duplicatePosition = findDuplicatePositionKey(moves);
       if (duplicatePosition) {
@@ -496,7 +497,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
         return;
       }
 
-      const result = engine.play(moves);
+      const result = this.matchSession.play(client.sessionId, moves, this.nowMs());
       this.afterAction(result, client, {
         action: "play",
         placedPositions: result.ok ? moves.map((m) => m.position) : [],
@@ -505,15 +506,15 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   }
 
   private handleSwap(client: Client, rawPayload: unknown): void {
-    this.withActionGuard(client, swapMessageSchema, rawPayload, "invalid_swap", "Invalid swap", (data, engine) => {
-      const result = engine.swap(data.tileIds);
+    this.withActionGuard(client, swapMessageSchema, rawPayload, "invalid_swap", "Invalid swap", (data) => {
+      const result = this.matchSession.swap(client.sessionId, data.tileIds, this.nowMs());
       this.afterAction(result, client, { action: "swap", placedPositions: [] });
     });
   }
 
   private handlePass(client: Client, rawPayload: unknown): void {
-    this.withActionGuard(client, passMessageSchema, rawPayload ?? {}, "invalid_pass", "Invalid pass", (_data, engine) => {
-      const result = engine.pass();
+    this.withActionGuard(client, passMessageSchema, rawPayload ?? {}, "invalid_pass", "Invalid pass", () => {
+      const result = this.matchSession.pass(client.sessionId, this.nowMs());
       this.afterAction(result, client, { action: "pass", placedPositions: [] });
     });
   }
@@ -534,7 +535,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       return;
     }
     // Clock settlement for the player who just acted (client.sessionId).
-    this.settleTurn(client.sessionId);
+    this.syncClockView(client.sessionId);
     this.syncFromEngine({
       action: ctx.action,
       scoreDelta: result.scoreDelta,
@@ -543,31 +544,10 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     });
 
     if (this.state.phase === "finished") {
-      this.applyTriggerBAdjustmentIfNeeded();
       this.finalizeWinner();
       this.stopClockTicker();
-      this.turnStartedAt = null;
-    } else {
-      // Start the incoming player's clock.
-      this.turnStartedAt = this.nowMs();
     }
     for (const sessionId of this.seats.keys()) this.broadcastRack(sessionId);
-  }
-
-  /** Trigger B: engine emits phase=finished after "everyone passes once in a
-   * row" (consecutivePasses ≥ players.length). Each player gains 2× the sum of
-   * all OTHER players' remaining rack values — generalization of the 2-player
-   * rule to N players. */
-  private applyTriggerBAdjustmentIfNeeded(): void {
-    if (!this.engine) return;
-    const snap = this.engine.getState();
-    if (snap.consecutivePasses < this.engine.getConsecutivePassesLimit()) return;
-
-    const bonuses = calculateTriggerBBonuses(snap.players);
-    for (const p of snap.players) {
-      const view = this.playerViewForSession(p.id);
-      if (view) view.score += bonuses.get(p.id) ?? 0;
-    }
   }
 
   private finalizeWinner(): void {
@@ -584,8 +564,9 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     placedPositions: Position[];
     actorSessionId?: string;
   }): void {
-    if (!this.engine) return;
-    const snap = this.engine.getState();
+    const engine = this.matchSession.getEngine();
+    if (!engine) return;
+    const snap = engine.getState();
     roomLog("syncFromEngine", {
       roomId: this.roomId,
       matchId: this.matchId,
@@ -600,7 +581,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     syncFromEngineSnapshot({
       state: this.state,
       snapshot: snap,
-      seats: this.seats,
+      getClockState: (sessionId) => this.matchSession.matchClock.getPlayerState(sessionId),
       playerViewForSession: (sessionId) => this.playerViewForSession(sessionId),
       ctx,
       nowMs: this.nowMs(),
@@ -608,7 +589,8 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   }
 
   private broadcastRack(sessionId: string): void {
-    if (!this.engine) {
+    const engine = this.matchSession.getEngine();
+    if (!engine) {
       roomLog("broadcastRack", {
         roomId: this.roomId,
         matchId: this.matchId,
@@ -619,7 +601,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       this.sendToSession(sessionId, "rack", { tiles: [] });
       return;
     }
-    const snap = this.engine.getState();
+    const snap = engine.getState();
     const player = snap.players.find((p) => p.id === sessionId);
     if (!player) {
       roomLog("broadcastRack", {

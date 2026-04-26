@@ -1,4 +1,5 @@
-import type { Placement } from "@entities";
+import type { Placement, GameMode } from "@entities";
+import { CLASSIC_MODE } from "@entities";
 import { Board } from "./board";
 import { TileBag } from "./tile-bag";
 import { MoveValidator } from "./move-validator";
@@ -81,7 +82,7 @@ export class TurnManager {
 
   static validateSwap(bag: TileBag): SwapResult {
     if (!bag.canSwap()) {
-      return { ok: false, error: "Cannot swap: bag must have more than 5 tiles remaining" };
+      return { ok: false, error: "Cannot swap: not enough tiles in bag" };
     }
     return { ok: true };
   }
@@ -90,10 +91,11 @@ export class TurnManager {
     board: Board,
     placements: Placement[],
     isFirstMove: boolean,
+    mode: GameMode = CLASSIC_MODE,
   ): PlayAndScoreResult {
     const result = this.validatePlay(board, placements, isFirstMove);
     if (!result.ok) return result;
-    const score = Scorer.scoreTurn(board, placements, result.equations);
+    const score = Scorer.scoreTurn(board, placements, result.equations, mode.rackSize, mode.bingoBonus);
     return {
       ok: true,
       equations: result.equations,

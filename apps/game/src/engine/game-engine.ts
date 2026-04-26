@@ -1,5 +1,5 @@
-import type { BlankAssignment, GamePhase, GameState, Placement, Player, Position, Tile } from "@entities";
-import { GAME_CONFIG } from "@entities";
+import type { BlankAssignment, GamePhase, GameState, Placement, Player, Position, Tile, GameMode } from "@entities";
+import { CLASSIC_MODE } from "@entities";
 import { Board } from "./board";
 import { assignTile, TileBag } from "./tile-bag";
 import { TurnManager, type PlayAndScoreResult } from "./turn-manager";
@@ -23,6 +23,7 @@ export interface CreateGameOptions {
   startPosition?: Position;
   /** Pass-out threshold ("everyone passes once in a row"). Defaults to players.length. */
   consecutivePassesLimit?: number;
+  mode?: GameMode;
 }
 
 export interface GameEngineSetup {
@@ -36,6 +37,7 @@ export interface GameEngineSetup {
   isFirstMove?: boolean;
   rngSeed?: number | string;
   consecutivePassesLimit?: number;
+  mode?: GameMode;
 }
 
 function cloneTile(tile: Tile): Tile {
@@ -65,6 +67,7 @@ export class GameEngine {
   private isFirstMove: boolean;
   private readonly swapRng: seedrandom.PRNG;
   private readonly consecutivePassesLimit: number;
+  private readonly mode: GameMode;
 
   private constructor(setup: Required<GameEngineSetup>) {
     this.board = setup.board;
@@ -77,6 +80,7 @@ export class GameEngine {
     this.isFirstMove = setup.isFirstMove;
     this.swapRng = seedrandom(String(setup.rngSeed));
     this.consecutivePassesLimit = setup.consecutivePassesLimit;
+    this.mode = setup.mode;
   }
 
   getConsecutivePassesLimit(): number {
@@ -87,12 +91,13 @@ export class GameEngine {
     if (playerIds.length < 2) {
       throw new Error("Game requires at least 2 players");
     }
+    const mode = options.mode ?? CLASSIC_MODE;
     const seed = options.seed ?? Date.now();
-    const board = Board.create(options.startPosition ?? GAME_CONFIG.DEFAULT_START_POSITION);
-    const bag = TileBag.create(seed);
+    const board = Board.create(mode.boardSize, options.startPosition ?? mode.startPosition, mode.premiumSquares);
+    const bag = TileBag.create(seed, mode.tileConfigs, mode.swapBagMinimum);
     const players: Player[] = playerIds.map((id) => ({
       id,
-      rack: bag.draw(GAME_CONFIG.RACK_SIZE),
+      rack: bag.draw(mode.rackSize),
       score: 0,
     }));
     return new GameEngine({
@@ -106,6 +111,7 @@ export class GameEngine {
       isFirstMove: true,
       rngSeed: seed,
       consecutivePassesLimit: options.consecutivePassesLimit ?? playerIds.length,
+      mode,
     });
   }
 
@@ -113,9 +119,10 @@ export class GameEngine {
     if (setup.players.length < 2) {
       throw new Error("Game requires at least 2 players");
     }
+    const mode = setup.mode ?? CLASSIC_MODE;
     return new GameEngine({
-      board: setup.board ?? Board.create(),
-      bag: setup.bag ?? TileBag.create("setup"),
+      board: setup.board ?? Board.create(mode.boardSize, mode.startPosition, mode.premiumSquares),
+      bag: setup.bag ?? TileBag.create("setup", mode.tileConfigs, mode.swapBagMinimum),
       players: setup.players.map(clonePlayer),
       currentPlayerIndex: setup.currentPlayerIndex ?? 0,
       phase: setup.phase ?? "playing",
@@ -124,6 +131,7 @@ export class GameEngine {
       isFirstMove: setup.isFirstMove ?? true,
       rngSeed: setup.rngSeed ?? "setup",
       consecutivePassesLimit: setup.consecutivePassesLimit ?? setup.players.length,
+      mode,
     });
   }
 
@@ -138,6 +146,7 @@ export class GameEngine {
       turnNumber: this.turnNumber,
       isFirstMove: this.isFirstMove,
       startPosition: this.board.startPosition,
+      mode: this.mode.id,
     };
   }
 
@@ -197,6 +206,7 @@ export class GameEngine {
       this.board,
       placements,
       this.isFirstMove,
+      this.mode,
     );
 
     if (!validated.ok) {
@@ -212,7 +222,7 @@ export class GameEngine {
     player.score += validated.score.total;
 
     // Refill rack.
-    const need = GAME_CONFIG.RACK_SIZE - player.rack.length;
+    const need = this.mode.rackSize - player.rack.length;
     if (need > 0) {
       player.rack.push(...this.bag.draw(need));
     }
@@ -250,7 +260,7 @@ export class GameEngine {
     if (!prepared.ok) return prepared;
     const { placements } = prepared;
 
-    const result = TurnManager.validateAndScorePlay(this.board, placements, this.isFirstMove);
+    const result = TurnManager.validateAndScorePlay(this.board, placements, this.isFirstMove, this.mode);
     for (const p of placements) this.board.removeTile(p.position);
     if (!result.ok) return { ok: false, error: result.error };
     return { ok: true, score: result.score.total };
@@ -307,8 +317,7 @@ export class GameEngine {
 
     this.consecutivePasses++;
     if (this.consecutivePasses >= this.consecutivePassesLimit) {
-      this.phase = "finished";
-      this.turnNumber++;
+      this.finishByConsecutivePasses();
       return {
         ok: true,
         phase: this.phase,
@@ -326,6 +335,25 @@ export class GameEngine {
       currentPlayerId: this.players[this.currentPlayerIndex]!.id,
       scoreDelta: 0,
     };
+  }
+
+  private finishByConsecutivePasses(): void {
+    const rackValueById = new Map<string, number>();
+    let totalRackValue = 0;
+    
+    for (const p of this.players) {
+      const val = scoreRack(p.rack);
+      rackValueById.set(p.id, val);
+      totalRackValue += val;
+    }
+
+    for (const p of this.players) {
+      const othersRackValue = totalRackValue - (rackValueById.get(p.id) ?? 0);
+      p.score += othersRackValue * 2;
+    }
+
+    this.phase = "finished";
+    this.turnNumber++;
   }
 
   private finishByRackEmpty(finisherId: string): void {

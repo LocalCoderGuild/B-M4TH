@@ -1,6 +1,6 @@
 import { ArraySchema, Schema, type } from "@colyseus/schema";
 import {
-  GAME_CONFIG,
+  CLASSIC_MODE,
   MIN_PLAYERS,
   SCHEMA_DEFAULT_TIME_CONTROL,
 } from "@entities";
@@ -52,7 +52,7 @@ export class MatchStateSchema extends Schema {
   @type("boolean") isFirstMove: boolean = true;
   @type("number") consecutivePasses: number = 0;
   @type("number") bagRemaining: number = 0;
-  @type("number") boardSize: number = GAME_CONFIG.BOARD_SIZE;
+  @type("number") boardSize: number = CLASSIC_MODE.boardSize;
   @type([CellView]) board = new ArraySchema<CellView>();
   @type([PlayerView]) players = new ArraySchema<PlayerView>();
   @type(LastMoveView) lastMove?: LastMoveView;

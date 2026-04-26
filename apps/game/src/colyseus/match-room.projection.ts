@@ -13,12 +13,12 @@ export interface SyncFromEngineContext {
 export function syncFromEngineSnapshot(params: {
   state: MatchStateSchema;
   snapshot: GameState;
-  seats: ReadonlyMap<string, { penaltyScoreTotal: number }>;
+  getClockState: (sessionId: string) => { penaltyScoreTotal: number } | undefined;
   playerViewForSession: (sessionId: string) => PlayerView | undefined;
   ctx: SyncFromEngineContext;
   nowMs: number;
 }): void {
-  const { state, snapshot, seats, playerViewForSession, ctx, nowMs } = params;
+  const { state, snapshot, getClockState, playerViewForSession, ctx, nowMs } = params;
 
   state.turnNumber = snapshot.turnNumber;
   state.currentSessionId = snapshot.currentPlayerId;
@@ -35,9 +35,9 @@ export function syncFromEngineSnapshot(params: {
 
   for (const enginePlayer of snapshot.players) {
     const view = playerViewForSession(enginePlayer.id);
-    const seat = seats.get(enginePlayer.id);
+    const clockState = getClockState(enginePlayer.id);
     if (!view) continue;
-    view.score = enginePlayer.score - (seat?.penaltyScoreTotal ?? 0);
+    view.score = enginePlayer.score - (clockState?.penaltyScoreTotal ?? 0);
     view.rackCount = enginePlayer.rack.length;
   }
 

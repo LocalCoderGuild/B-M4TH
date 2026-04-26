@@ -1,7 +1,5 @@
-import type { Tile, Position, BoardCell, PremiumType } from "@entities";
-import { GAME_CONFIG, PREMIUM_SQUARES } from "@entities";
-
-const { BOARD_SIZE, DEFAULT_START_POSITION } = GAME_CONFIG;
+import type { Tile, Position, BoardCell, PremiumType, PremiumEntry } from "@entities";
+import { CLASSIC_MODE } from "@entities";
 
 const PREMIUM_SYMBOL: Record<PremiumType, string> = {
   normal: " . ",
@@ -14,23 +12,31 @@ const PREMIUM_SYMBOL: Record<PremiumType, string> = {
 export class Board {
   private grid: BoardCell[][];
   private readonly _startPosition: Position;
+  public readonly size: number;
 
-  private constructor(grid: BoardCell[][], startPosition: Position) {
+  private constructor(grid: BoardCell[][], startPosition: Position, size: number) {
     this.grid = grid;
     this._startPosition = startPosition;
+    this.size = size;
   }
 
-  static create(startPosition: Position = DEFAULT_START_POSITION): Board {
-    const grid: BoardCell[][] = Array.from({ length: BOARD_SIZE }, () =>
-      Array.from({ length: BOARD_SIZE }, () => ({
+  static create(
+    size: number = CLASSIC_MODE.boardSize,
+    startPosition: Position = CLASSIC_MODE.startPosition,
+    premiumSquares: readonly PremiumEntry[] = CLASSIC_MODE.premiumSquares
+  ): Board {
+    const grid: BoardCell[][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => ({
         tile: null,
         premium: "normal" as PremiumType,
       })),
     );
-    for (const [row, col, premium] of PREMIUM_SQUARES) {
-      grid[row]![col]!.premium = premium;
+    for (const [row, col, premium] of premiumSquares) {
+      if (row >= 0 && row < size && col >= 0 && col < size) {
+        grid[row]![col]!.premium = premium;
+      }
     }
-    return new Board(grid, startPosition);
+    return new Board(grid, startPosition, size);
   }
 
   get startPosition(): Position {
@@ -40,9 +46,9 @@ export class Board {
   isInBounds(pos: Position): boolean {
     return (
       pos.row >= 0 &&
-      pos.row < BOARD_SIZE &&
+      pos.row < this.size &&
       pos.col >= 0 &&
-      pos.col < BOARD_SIZE
+      pos.col < this.size
     );
   }
 
@@ -78,7 +84,7 @@ export class Board {
 
   toString(): string {
     const lines: string[] = [];
-    for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let r = 0; r < this.size; r++) {
       const cells = this.grid[r]!.map((cell, c) => {
         if (cell.tile !== null) {
           return cell.tile.face.padEnd(3, " ").slice(0, 3);

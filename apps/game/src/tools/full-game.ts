@@ -1,11 +1,12 @@
 import {
-  GAME_CONFIG,
-  type BlankAssignment,
+  CLASSIC_MODE,
   type BoardCell,
   type GameState,
   type Placement,
   type Position,
   type Tile,
+  type BlankAssignment,
+  type Player,
 } from "@entities";
 import { Board } from "@engine/board";
 import { GameEngine } from "@engine/game-engine";
@@ -145,7 +146,7 @@ function hasAdjacentExistingTile(board: BoardCell[][], positions: Position[]): b
       { row: pos.row, col: pos.col + 1 },
     ];
     for (const n of neighbors) {
-      if (n.row < 0 || n.row >= GAME_CONFIG.BOARD_SIZE || n.col < 0 || n.col >= GAME_CONFIG.BOARD_SIZE) {
+      if (n.row < 0 || n.row >= CLASSIC_MODE.boardSize || n.col < 0 || n.col >= CLASSIC_MODE.boardSize) {
         continue;
       }
       const key = posKey(n.row, n.col);
@@ -159,9 +160,9 @@ function hasAdjacentExistingTile(board: BoardCell[][], positions: Position[]): b
 }
 
 function buildBoardFromState(state: GameState): Board {
-  const board = Board.create(state.startPosition);
-  for (let row = 0; row < GAME_CONFIG.BOARD_SIZE; row++) {
-    for (let col = 0; col < GAME_CONFIG.BOARD_SIZE; col++) {
+  const board = Board.create(CLASSIC_MODE.boardSize, state.startPosition, CLASSIC_MODE.premiumSquares);
+  for (let row = 0; row < CLASSIC_MODE.boardSize; row++) {
+    for (let col = 0; col < CLASSIC_MODE.boardSize; col++) {
       const cell = state.board[row]?.[col];
       if (cell?.tile) {
         board.placeTile({ row, col }, { ...cell.tile });
@@ -328,15 +329,15 @@ function scoreMove(
     placements.push({ tile: placedTile, position: move.position });
   }
 
-  const result = TurnManager.validateAndScorePlay(board, placements, state.isFirstMove);
+  const result = TurnManager.validateAndScorePlay(board, placements, state.isFirstMove, CLASSIC_MODE);
   if (!result.ok) return null;
   return result.score.total;
 }
 
 function listAnchors(state: GameState): Anchor[] {
   const anchors: Anchor[] = [];
-  for (let row = 0; row < GAME_CONFIG.BOARD_SIZE; row++) {
-    for (let col = 0; col < GAME_CONFIG.BOARD_SIZE; col++) {
+  for (let row = 0; row < CLASSIC_MODE.boardSize; row++) {
+    for (let col = 0; col < CLASSIC_MODE.boardSize; col++) {
       const tile = state.board[row]?.[col]?.tile;
       if (!tile) continue;
       anchors.push({
@@ -362,12 +363,12 @@ function pickGreedyMove(engine: GameEngine, state: GameState): ChosenMove | null
       const dc = dir === "horizontal" ? 1 : 0;
       const maxRow =
         dir === "horizontal"
-          ? GAME_CONFIG.BOARD_SIZE - 1
-          : GAME_CONFIG.BOARD_SIZE - candidate.tiles.length;
+          ? CLASSIC_MODE.boardSize - 1
+          : CLASSIC_MODE.boardSize - candidate.tiles.length;
       const maxCol =
         dir === "horizontal"
-          ? GAME_CONFIG.BOARD_SIZE - candidate.tiles.length
-          : GAME_CONFIG.BOARD_SIZE - 1;
+          ? CLASSIC_MODE.boardSize - candidate.tiles.length
+          : CLASSIC_MODE.boardSize - 1;
 
       for (let row = 0; row <= maxRow; row++) {
         for (let col = 0; col <= maxCol; col++) {
@@ -427,9 +428,9 @@ function pickGreedyMove(engine: GameEngine, state: GameState): ChosenMove | null
               };
               if (
                 pos.row < 0 ||
-                pos.row >= GAME_CONFIG.BOARD_SIZE ||
+                pos.row >= CLASSIC_MODE.boardSize ||
                 pos.col < 0 ||
-                pos.col >= GAME_CONFIG.BOARD_SIZE
+                pos.col >= CLASSIC_MODE.boardSize
               ) {
                 valid = false;
                 break;
@@ -479,12 +480,12 @@ function pickGreedyMove(engine: GameEngine, state: GameState): ChosenMove | null
 }
 
 function formatBoard(state: GameState): string {
-  const headerCells = Array.from({ length: GAME_CONFIG.BOARD_SIZE }, (_, c) => c.toString().padStart(2, " "));
+  const headerCells = Array.from({ length: CLASSIC_MODE.boardSize }, (_, c) => c.toString().padStart(2, " "));
   const lines = [`    ${headerCells.join(" ")}`];
 
-  for (let r = 0; r < GAME_CONFIG.BOARD_SIZE; r++) {
+  for (let r = 0; r < CLASSIC_MODE.boardSize; r++) {
     const rowCells: string[] = [];
-    for (let c = 0; c < GAME_CONFIG.BOARD_SIZE; c++) {
+    for (let c = 0; c < CLASSIC_MODE.boardSize; c++) {
       const cell = state.board[r]?.[c];
       if (!cell) continue;
       if (cell.tile) {
@@ -515,10 +516,10 @@ function chooseSwapIds(rack: Tile[]): string[] {
   });
   if (unresolved.length > 0) {
     const rest = rack.filter((t) => !unresolved.some((u) => u.id === t.id));
-    return [...unresolved, ...rest].slice(0, GAME_CONFIG.RACK_SIZE).map((t) => t.id);
+    return [...unresolved, ...rest].slice(0, CLASSIC_MODE.rackSize).map((t) => t.id);
   }
   const sorted = [...rack].sort((a, b) => a.value - b.value);
-  return sorted.slice(0, GAME_CONFIG.RACK_SIZE).map((t) => t.id);
+  return sorted.slice(0, CLASSIC_MODE.rackSize).map((t) => t.id);
 }
 
 function countTiles(board: BoardCell[][]): number {
@@ -549,19 +550,19 @@ function run(): void {
   while (state.phase === "playing" && turnCounter < args.maxTurns) {
     turnCounter++;
     const actorId = state.currentPlayerId;
-    const beforeScore = state.players.find((p) => p.id === actorId)?.score ?? 0;
+    const beforeScore = state.players.find((p: Player) => p.id === actorId)?.score ?? 0;
     const greedy = pickGreedyMove(engine, state);
     let actionText = "";
 
     if (greedy) {
       const afterState = engine.getState();
-      const afterScore = afterState.players.find((p) => p.id === actorId)?.score ?? beforeScore;
+      const afterScore = afterState.players.find((p: Player) => p.id === actorId)?.score ?? beforeScore;
       const delta = afterScore - beforeScore;
       actionText = `play ${greedy.candidate.faces.join(" ")} | +${delta}`;
       stalledTurns = delta > 0 ? 0 : stalledTurns + 1;
     } else {
-      const player = state.players.find((p) => p.id === actorId);
-      const canSwap = state.tileBag.length > GAME_CONFIG.SWAP_BAG_MINIMUM && stalledTurns < 24;
+      const player = state.players.find((p: Player) => p.id === actorId);
+      const canSwap = state.tileBag.length > CLASSIC_MODE.swapBagMinimum && stalledTurns < 24;
       if (canSwap && player) {
         const swapIds = chooseSwapIds(player.rack);
         const swap = engine.swap(swapIds);

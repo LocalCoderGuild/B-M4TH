@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { GAME_CONFIG, TILE_CONFIGS, VALID_BLANK_ASSIGNMENTS } from "@entities";
+import { TILE_CONFIGS, VALID_BLANK_ASSIGNMENTS } from "@entities";
 import { PLAYER_COLOR_KEYS } from "@b-m4th/shared";
 import { timeControlSchema } from "./time-control-schema";
 
 const positionSchema = z.object({
-  row: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),
-  col: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),
+  row: z.number().int().min(0).max(100),
+  col: z.number().int().min(0).max(100),
 });
 
 const blankAssignmentSchema = z.enum(VALID_BLANK_ASSIGNMENTS);
@@ -21,11 +21,11 @@ const playMoveSchema = z.object({
 });
 
 export const playMessageSchema = z.object({
-  moves: z.array(playMoveSchema).min(1).max(GAME_CONFIG.RACK_SIZE),
+  moves: z.array(playMoveSchema).min(1).max(32),
 });
 
 export const swapMessageSchema = z.object({
-  tileIds: z.array(z.string().min(1).max(64)).min(1).max(GAME_CONFIG.RACK_SIZE),
+  tileIds: z.array(z.string().min(1).max(64)).min(1).max(32),
 });
 
 export const passMessageSchema = z.object({}).strict();
@@ -43,8 +43,8 @@ export const pickColorSchema = z.object({
 
 const pendingUpdateMoveSchema = z.object({
   tileId: z.string().min(1).max(64),
-  row: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),
-  col: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),
+  row: z.number().int().min(0).max(100),
+  col: z.number().int().min(0).max(100),
   face: z
     .string()
     .min(1)
@@ -55,5 +55,5 @@ const pendingUpdateMoveSchema = z.object({
 });
 
 export const pendingUpdateSchema = z.object({
-  moves: z.array(pendingUpdateMoveSchema).max(GAME_CONFIG.RACK_SIZE),
+  moves: z.array(pendingUpdateMoveSchema).max(32),
 });
