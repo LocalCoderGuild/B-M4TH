@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { createPixiApp } from "../pixi/createPixiApp";
 import { PuzzleStageBackground, type PuzzleStageOptions } from "../pixi/scenes/PuzzleStageBackground";
+import { EVENTS } from "../constants";
 
 export type PuzzleEffectEvent =
   | { type: "cell-select"; x: number; y: number }
@@ -11,7 +12,7 @@ export type PuzzleEffectEvent =
   | { type: "puzzle-complete" };
 
 export function dispatchPuzzleEffect(detail: PuzzleEffectEvent): void {
-  window.dispatchEvent(new CustomEvent<PuzzleEffectEvent>("b-m4th:puzzle-effect", { detail }));
+  window.dispatchEvent(new CustomEvent<PuzzleEffectEvent>(EVENTS.PUZZLE_EFFECT, { detail }));
 }
 
 interface PixiStageProps {
@@ -80,8 +81,8 @@ export function PixiStage({ options }: PixiStageProps) {
       else if (detail.type === "bingo") scene.onBingo();
       else if (detail.type === "puzzle-complete") scene.onPuzzleComplete();
     };
-    window.addEventListener("b-m4th:puzzle-effect", handler);
-    return () => window.removeEventListener("b-m4th:puzzle-effect", handler);
+    window.addEventListener(EVENTS.PUZZLE_EFFECT, handler);
+    return () => window.removeEventListener(EVENTS.PUZZLE_EFFECT, handler);
   }, []);
 
   return <div ref={hostRef} className="puzzle-pixi-stage" aria-hidden="true" />;

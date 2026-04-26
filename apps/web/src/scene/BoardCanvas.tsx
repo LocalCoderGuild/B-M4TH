@@ -4,6 +4,7 @@ import { useMatchStore, type MatchSnapshot } from "../store/match-store";
 import { getPlayerPaletteByKey, isHexColor } from "../ui/player-colors";
 import { BoardScene } from "./board-scene";
 import { needsAssignment } from "../ui/tile-assignment";
+import { BOARD_SIZE, EVENTS } from "../constants";
 
 export function BoardCanvas() {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -43,11 +44,11 @@ export function BoardCanvas() {
       if (detail) setTooltip(detail);
     };
     const hide = () => setTooltip(null);
-    window.addEventListener("b-m4th:board-tooltip", show);
-    window.addEventListener("b-m4th:board-tooltip-hide", hide);
+    window.addEventListener(EVENTS.BOARD_TOOLTIP, show);
+    window.addEventListener(EVENTS.BOARD_TOOLTIP_HIDE, hide);
     return () => {
-      window.removeEventListener("b-m4th:board-tooltip", show);
-      window.removeEventListener("b-m4th:board-tooltip-hide", hide);
+      window.removeEventListener(EVENTS.BOARD_TOOLTIP, show);
+      window.removeEventListener(EVENTS.BOARD_TOOLTIP_HIDE, hide);
     };
   }, []);
 
@@ -56,6 +57,7 @@ export function BoardCanvas() {
     if (!host) return;
 
     let cancelled = false;
+    const gridSize = useMatchStore.getState().snapshot?.boardSize ?? BOARD_SIZE;
     const scene = new BoardScene(host, {
       onCellPointerUp: (row, col) => handleCellPointerUp(row, col),
       onCellPointerEnter: (row, col) =>
@@ -68,7 +70,7 @@ export function BoardCanvas() {
       onPendingTileClick: (row, col) => {
         useMatchStore.getState().removePendingAt(row, col);
       },
-    });
+    }, gridSize);
     sceneRef.current = scene;
 
     void scene.init().then(() => {
@@ -245,7 +247,7 @@ function handleCellPointerUp(row: number, col: number): void {
     // Defer: drag end is captured but placement requires a face choice.
     store.endDrag();
     window.dispatchEvent(
-      new CustomEvent("b-m4th:assign-tile", {
+      new CustomEvent(EVENTS.ASSIGN_TILE, {
         detail: { tileId: tile.id, row, col, face: tile.face },
       }),
     );

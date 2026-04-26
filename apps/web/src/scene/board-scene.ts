@@ -9,8 +9,7 @@ import {
 } from "pixi.js";
 import type { BoardCellView } from "../store/match-store";
 import type { PendingPlacement, PremiumType } from "../types";
-
-const GRID = 15;
+import { BOARD_SIZE, EVENTS, FONT_FAMILY, BOARD_BG_COLOR } from "../constants";
 
 const PREMIUM_COLORS: Record<string, number> = {
   normal: 0x171d2b,
@@ -57,6 +56,7 @@ export class BoardScene {
   private readonly ghostLayer = new Container();
   private readonly opponentGhostLayer = new Container();
   private readonly highlightLayer = new Container();
+  private readonly gridSize: number;
   private readonly cells: CellNode[][] = [];
   private cellSize = 40;
   private disposed = false;
@@ -70,10 +70,11 @@ export class BoardScene {
   private currentOpponentPending: PendingPlacement[] = [];
   private currentOpponentColor = "";
 
-  constructor(host: HTMLElement, callbacks: BoardSceneCallbacks) {
+  constructor(host: HTMLElement, callbacks: BoardSceneCallbacks, gridSize = BOARD_SIZE) {
     this.app = new Application();
     this.host = host;
     this.callbacks = callbacks;
+    this.gridSize = gridSize;
   }
 
   async init(): Promise<void> {
@@ -87,7 +88,7 @@ export class BoardScene {
       }
     }
     await this.app.init({
-      background: "#070b18",
+      background: BOARD_BG_COLOR,
       resizeTo: this.host,
       antialias: false,
       autoDensity: true,
@@ -131,9 +132,9 @@ export class BoardScene {
   }
 
   private buildCells(): void {
-    for (let row = 0; row < GRID; row++) {
+    for (let row = 0; row < this.gridSize; row++) {
       const rowArr: CellNode[] = [];
-      for (let col = 0; col < GRID; col++) {
+      for (let col = 0; col < this.gridSize; col++) {
         // Container is the event target — a single interactive object per cell.
         const container = new Container();
         container.eventMode = "static";
@@ -146,7 +147,7 @@ export class BoardScene {
         container.on("pointerup", (event: FederatedPointerEvent) => {
           event.stopPropagation();
           this.emitEffect("cell-select", rowRef, colRef);
-          const cell = this.currentBoard[rowRef * GRID + colRef];
+          const cell = this.currentBoard[rowRef * this.gridSize + colRef];
           if (cell?.tile) {
             this.callbacks.onPlacedTileClick(rowRef, colRef);
           } else {
@@ -162,7 +163,7 @@ export class BoardScene {
         });
         container.on("pointerout", () => {
           this.callbacks.onCellPointerLeave();
-          window.dispatchEvent(new CustomEvent("b-m4th:board-tooltip-hide"));
+          window.dispatchEvent(new CustomEvent(EVENTS.BOARD_TOOLTIP_HIDE));
         });
 
         const bg = new Graphics();
@@ -185,16 +186,16 @@ export class BoardScene {
     if (size <= 0) return;
     const padding = 8;
     const available = size - padding * 2;
-    const cell = Math.max(16, Math.floor(available / GRID));
+    const cell = Math.max(16, Math.floor(available / this.gridSize));
     this.cellSize = cell;
-    const gridPx = cell * GRID;
+    const gridPx = cell * this.gridSize;
     this.root.position.set(
       Math.floor((this.host.clientWidth - gridPx) / 2),
       Math.floor((this.host.clientHeight - gridPx) / 2),
     );
     const hit = new Rectangle(0, 0, cell, cell);
-    for (let r = 0; r < GRID; r++) {
-      for (let c = 0; c < GRID; c++) {
+    for (let r = 0; r < this.gridSize; r++) {
+      for (let c = 0; c < this.gridSize; c++) {
         const node = this.cells[r]![c]!;
         node.container.position.set(c * cell, r * cell);
         node.container.hitArea = hit;
@@ -211,8 +212,8 @@ export class BoardScene {
     this.currentBoard = board;
     for (let i = 0; i < board.length; i++) {
       const cell = board[i]!;
-      const row = Math.floor(i / GRID);
-      const col = i % GRID;
+      const row = Math.floor(i / this.gridSize);
+      const col = i % this.gridSize;
       const node = this.cells[row]?.[col];
       if (!node) continue;
       this.drawCellBg(node.bg, cell.premium as PremiumType, row, col);
@@ -264,8 +265,8 @@ export class BoardScene {
     if (!indices.length || !colorHex) return;
     const color = parseInt(colorHex.replace("#", ""), 16);
     for (const idx of indices) {
-      const row = Math.floor(idx / GRID);
-      const col = idx % GRID;
+      const row = Math.floor(idx / this.gridSize);
+      const col = idx % this.gridSize;
       const g = new Graphics();
       const inset = 1;
       const size = this.cellSize - inset * 2;
@@ -293,8 +294,8 @@ export class BoardScene {
 
   highlightLastPlaced(indices: number[]): void {
     for (const idx of indices) {
-      const row = Math.floor(idx / GRID);
-      const col = idx % GRID;
+      const row = Math.floor(idx / this.gridSize);
+      const col = idx % this.gridSize;
       const node = this.cells[row]?.[col];
       if (!node) continue;
       this.emitEffect("entry-correct", row, col);
@@ -325,7 +326,7 @@ export class BoardScene {
     container.addChild(bg);
 
     const faceStyle = new TextStyle({
-      fontFamily: "\"Press Start 2P\", monospace",
+      fontFamily: FONT_FAMILY,
       fontSize: Math.max(10, Math.floor(size * 0.42)),
       fill: 0xffffff,
       fontWeight: "400",
@@ -339,7 +340,7 @@ export class BoardScene {
 
     if (p.value > 0) {
       const valStyle = new TextStyle({
-        fontFamily: "\"Press Start 2P\", monospace",
+        fontFamily: FONT_FAMILY,
         fontSize: Math.max(6, Math.floor(size * 0.16)),
         fill: 0xffffff,
         fontWeight: "400",
@@ -376,7 +377,8 @@ export class BoardScene {
       color: 0xffffff,
       alpha: 0.08,
     });
-    if (row === 7 && col === 7) {
+    const center = Math.floor(this.gridSize / 2);
+    if (row === center && col === center) {
       const star = Math.max(5, this.cellSize * 0.16);
       g.moveTo(this.cellSize / 2, this.cellSize / 2 - star)
         .lineTo(this.cellSize / 2 + star * 0.32, this.cellSize / 2 - star * 0.32)
@@ -400,7 +402,7 @@ export class BoardScene {
     const text = PREMIUM_LABELS[premium];
     if (!text) return;
     const style = new TextStyle({
-      fontFamily: "\"Press Start 2P\", monospace",
+      fontFamily: FONT_FAMILY,
       fontSize: Math.max(8, Math.floor(this.cellSize * 0.26)),
       fill: 0xfff3cf,
       fontWeight: "400",
@@ -451,7 +453,7 @@ export class BoardScene {
 
     const displayFace = assignedFace && assignedFace.length > 0 ? assignedFace : face;
     const faceStyle = new TextStyle({
-      fontFamily: "\"Press Start 2P\", monospace",
+      fontFamily: FONT_FAMILY,
       fontSize: Math.max(10, Math.floor(size * 0.42)),
       fill: ghost ? 0xf7fbff : 0x111832,
       fontWeight: "400",
@@ -470,7 +472,7 @@ export class BoardScene {
 
     if (value > 0) {
       const valStyle = new TextStyle({
-        fontFamily: "\"Press Start 2P\", monospace",
+        fontFamily: FONT_FAMILY,
         fontSize: Math.max(6, Math.floor(size * 0.16)),
         fill: ghost ? 0xa7b4e8 : 0x111832,
         fontWeight: "400",
@@ -500,18 +502,18 @@ export class BoardScene {
     const rootY = this.root.position.y + row * this.cellSize + this.cellSize / 2;
     const x = canvasRect.left + rootX;
     const y = canvasRect.top + rootY;
-    window.dispatchEvent(new CustomEvent("b-m4th:puzzle-effect", { detail: { type, x, y } }));
+    window.dispatchEvent(new CustomEvent(EVENTS.PUZZLE_EFFECT, { detail: { type, x, y } }));
   }
 
   private emitPremiumTooltip(row: number, col: number, event: FederatedPointerEvent): void {
-    const cell = this.currentBoard[row * GRID + col];
+    const cell = this.currentBoard[row * this.gridSize + col];
     const tooltip = premiumTooltip(cell?.premium);
     if (!tooltip) {
-      window.dispatchEvent(new CustomEvent("b-m4th:board-tooltip-hide"));
+      window.dispatchEvent(new CustomEvent(EVENTS.BOARD_TOOLTIP_HIDE));
       return;
     }
     window.dispatchEvent(
-      new CustomEvent("b-m4th:board-tooltip", {
+      new CustomEvent(EVENTS.BOARD_TOOLTIP, {
         detail: {
           title: tooltip.title,
           body: tooltip.body,

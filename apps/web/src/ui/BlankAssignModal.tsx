@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMatchStore } from "../store/match-store";
 import { getAssignmentDescription, getAssignmentGroups, getAssignmentTitle } from "./tile-assignment";
+import { EVENTS } from "../constants";
 
 interface AssignContext {
   tileId: string;
@@ -22,8 +23,8 @@ export function BlankAssignModal() {
       setContext(detail);
       setOpen(true);
     };
-    window.addEventListener("b-m4th:assign-tile", handler);
-    return () => window.removeEventListener("b-m4th:assign-tile", handler);
+    window.addEventListener(EVENTS.ASSIGN_TILE, handler);
+    return () => window.removeEventListener(EVENTS.ASSIGN_TILE, handler);
   }, []);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { SoundManager } from "../../audio/SoundManager";
 import { dispatchPuzzleEffect } from "../PixiStage";
+import { EVENTS } from "../../constants";
 
 const DEFAULT_MESSAGES = ["Nice!", "Great!", "Awesome!", "Perfect!"];
 
@@ -12,7 +13,7 @@ export interface ComboCalloutEvent {
 }
 
 export function showComboCallout(detail: ComboCalloutEvent): void {
-  window.dispatchEvent(new CustomEvent<ComboCalloutEvent>("b-m4th:combo-callout", { detail }));
+  window.dispatchEvent(new CustomEvent<ComboCalloutEvent>(EVENTS.COMBO_CALLOUT, { detail }));
 }
 
 export function ComboCallout({ messages = DEFAULT_MESSAGES }: { messages?: string[] }) {
@@ -27,8 +28,8 @@ export function ComboCallout({ messages = DEFAULT_MESSAGES }: { messages?: strin
       dispatchPuzzleEffect({ type: "combo", level: detail.level, x: detail.x, y: detail.y });
       window.setTimeout(() => setCallout((current) => (current === detail ? null : current)), 900);
     };
-    window.addEventListener("b-m4th:combo-callout", handler);
-    return () => window.removeEventListener("b-m4th:combo-callout", handler);
+    window.addEventListener(EVENTS.COMBO_CALLOUT, handler);
+    return () => window.removeEventListener(EVENTS.COMBO_CALLOUT, handler);
   }, []);
 
   if (!callout) return null;
