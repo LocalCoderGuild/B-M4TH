@@ -7,7 +7,8 @@ import {
 } from "../http";
 import { InviteStore } from "./invite-store";
 import { MatchRegistry } from "./match-registry";
-import { MatchRoom, MATCH_ROOM_NAME } from "./match-room";
+import { MatchRoom } from "./match-room";
+import { MATCH_ROOM_NAME } from "./match-room.config";
 import { env } from "src/env";
 
 export interface BootstrapOptions {

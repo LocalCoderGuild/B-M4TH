@@ -1,7 +1,7 @@
 import { ArraySchema } from "@colyseus/schema";
 import { Room } from "colyseus";
 import type { Client } from "colyseus";
-import { z } from "zod";
+import type { ZodType } from "zod";
 import { GameEngine, type GameActionResult } from "@engine/game-engine";
 import { type BoardCell, type Tile, type Position, type BlankAssignment, type TimeControl } from "@entities";
 import {
@@ -9,149 +9,54 @@ import {
   GAME_CONFIG,
   MAX_PLAYERS,
   MIN_PLAYERS,
-  VALID_BLANK_ASSIGNMENTS,
 } from "@entities";
 import { InviteStore } from "./invite-store";
 import { posKey } from "@engine/pos-key";
 import {
   minutesToMs,
-  PLAYER_COLOR_KEYS,
-  defaultColorForSeat,
   createLogger,
-  validateDisplayName,
 } from "@b-m4th/shared";
-import type { PlayerColorKey } from "@b-m4th/shared";
 import { MatchRegistry } from "./match-registry";
-import { timeControlSchema } from "./schemas/time-control-schema";
 import {
-  CellView,
-  LastMoveView,
+  createSeatRecord,
+  getJoinAuthError,
+  nextAvailableSeatIndex,
+  pickFirstAvailableColor,
+  resolveJoinName,
+} from "./match-room.join";
+import type {
+  CreateOptions,
+  JoinOptions,
+  SeatRecord,
+} from "./match-room.types";
+import {
+  passMessageSchema,
+  pendingUpdateSchema,
+  pickColorSchema,
+  playMessageSchema,
+  setTimeControlSchema,
+  startMessageSchema,
+  swapMessageSchema,
+} from "./schemas/match-room-message-schema";
+import {
+  MATCH_ROOM_DEFAULTS,
+  type MatchRoomDefineOptions,
+} from "./match-room.config";
+import { previewPenalty, tilesToClient } from "./match-room.helpers";
+import {
+  calculateTriggerBBonuses,
+  pickWinnerSessionId,
+  settleTurnState,
+  syncSeatBanks,
+} from "./match-room.lifecycle";
+import { syncFromEngineSnapshot } from "./match-room.projection";
+import {
   MatchStateSchema,
   PlayerView,
-  TileView,
+  CellView,
 } from "./schema";
 
-export const MATCH_ROOM_NAME = "match";
-
-export interface MatchRoomDefineOptions {
-  invites: InviteStore;
-  matches: MatchRegistry;
-  /** Optional: override clock timer interval (ms). Useful in tests. */
-  clockIntervalMs?: number;
-}
-
-interface CreateOptions {
-  matchId: string;
-  seed: string;
-}
-
-interface JoinOptions {
-  matchId?: string;
-  role?: "host" | "player";
-  name?: string;
-}
-
-interface SeatRecord {
-  sessionId: string;
-  role: "host" | "player";
-  seatIndex: number;
-  name: string;
-  connected: boolean;
-  bankRemainingMs: number;
-  overtimePenalty: number;
-  penaltyScoreTotal: number;
-}
-
-const RECONNECTION_GRACE_SECONDS = 300; // 5 minutes
-const RATE_LIMIT_WINDOW_MS = 500;
-const RACK_RECOVERY_WINDOW_MS = 1000;
-
 const roomLog = createLogger("colyseus.MatchRoom");
-
-const positionSchema = z.object({
-  row: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),
-  col: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),
-});
-
-const blankAssignmentSchema = z.enum(VALID_BLANK_ASSIGNMENTS);
-
-const playMoveSchema = z.object({
-  tileId: z.string().min(1).max(64),
-  position: positionSchema,
-  assignedFace: blankAssignmentSchema.optional(),
-});
-
-const playMessageSchema = z.object({
-  moves: z.array(playMoveSchema).min(1).max(GAME_CONFIG.RACK_SIZE),
-});
-
-const swapMessageSchema = z.object({
-  tileIds: z.array(z.string().min(1).max(64)).min(1).max(GAME_CONFIG.RACK_SIZE),
-});
-
-const passMessageSchema = z.object({}).strict();
-
-const startMessageSchema = z.object({}).strict();
-
-const setTimeControlSchema = timeControlSchema;
-
-const pickColorSchema = z.object({
-  color: z.union([
-    z.enum(PLAYER_COLOR_KEYS),
-    z.string().regex(/^#[0-9a-f]{6}$/i, "Must be a preset key or 6-digit hex color"),
-  ]),
-});
-
-const pendingUpdateMoveSchema = z.object({
-  tileId: z.string().min(1).max(64),
-  row: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),
-  col: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),
-  face: z.string().min(1).max(10),
-  assignedFace: blankAssignmentSchema.optional(),
-  value: z.number().int().min(0).max(100),
-});
-
-const pendingUpdateSchema = z.object({
-  moves: z.array(pendingUpdateMoveSchema).max(GAME_CONFIG.RACK_SIZE),
-});
-
-
-function cellToView(cell: BoardCell): CellView {
-  const view = new CellView();
-  view.premium = cell.premium;
-  if (cell.tile) {
-    const tv = new TileView();
-    tv.id = cell.tile.id;
-    tv.face = cell.tile.face;
-    tv.tileType = cell.tile.type;
-    tv.value = cell.tile.value;
-    tv.assignedFace = cell.tile.assignedFace ?? "";
-    view.tile = tv;
-  }
-  return view;
-}
-
-function previewPenalty(overageMs: number): number {
-  if (overageMs <= 0) return 0;
-  const minutesOver = Math.ceil(overageMs / 60_000);
-  return minutesOver * GAME_CONFIG.OVERTIME_PENALTY_PER_MINUTE;
-}
-
-function tilesToClient(rack: Tile[]): Array<{
-  id: string;
-  face: string;
-  type: string;
-  value: number;
-  assignedFace: string | null;
-}> {
-  return rack.map((t) => ({
-    id: t.id,
-    face: t.face,
-    type: t.type,
-    value: t.value,
-    assignedFace: t.assignedFace ?? null,
-  }));
-}
 
 export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   public static onBeforeJoin?: (room: MatchRoom, client: Client, options: JoinOptions) => void;
@@ -165,7 +70,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   private lastActionAt = new Map<string, number>();
   private lastRackRecoveryAt = new Map<string, number>();
   private lastPendingUpdateAt = new Map<string, number>();
-  private autoDisposeTimeoutMs = 30_000;
+  private autoDisposeTimeoutMs = MATCH_ROOM_DEFAULTS.autoDisposeTimeoutMs;
   private turnStartedAt: number | null = null;
   private clockTickHandle: { clear: () => void } | null = null;
 
@@ -230,35 +135,26 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       role: options?.role,
       name: options?.name,
     });
-    if (options?.matchId !== this.matchId) {
-      throw new Error("Invite does not belong to this match");
-    }
-    if (options?.role !== "host" && options?.role !== "player") {
-      throw new Error("Invalid role");
-    }
-    const parsedName = validateDisplayName(options.name);
-    if (!parsedName.ok) {
-      throw new Error("Invalid player name");
-    }
-    if (this.state.started) {
-      throw new Error("Match already started");
-    }
-    if (options.role === "host" && this.state.hostSessionId !== "") {
-      throw new Error("Host seat already taken");
-    }
-    if (this.state.players.length >= this.state.maxPlayers) {
-      throw new Error("Match is full");
-    }
+    const error = getJoinAuthError({
+      expectedMatchId: this.matchId,
+      options,
+      started: this.state.started,
+      hostSessionId: this.state.hostSessionId,
+      playerCount: this.state.players.length,
+      maxPlayers: this.state.maxPlayers,
+    });
+    if (error) throw new Error(error);
     return true;
   }
 
   override onJoin(client: Client, options: JoinOptions): void {
     const role = options.role as "host" | "player";
-    const parsedName = validateDisplayName(options.name);
-    const name = parsedName.ok ? parsedName.value : "Player";
+    const name = resolveJoinName(options.name);
 
     const seatIndex =
-      role === "host" ? 0 : this.nextAvailableSeatIndex();
+      role === "host"
+        ? 0
+        : nextAvailableSeatIndex(this.state.players, this.state.maxPlayers, this.state.players.length);
 
     roomLog("onJoin", {
       roomId: this.roomId,
@@ -271,16 +167,13 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     });
 
     const bankMs = minutesToMs(this.state.baseMinutes);
-    const seat: SeatRecord = {
+    const seat: SeatRecord = createSeatRecord({
       sessionId: client.sessionId,
       role,
       seatIndex,
       name,
-      connected: true,
       bankRemainingMs: bankMs,
-      overtimePenalty: 0,
-      penaltyScoreTotal: 0,
-    };
+    });
     this.seats.set(client.sessionId, seat);
 
     const view = this.playerViewForSession(client.sessionId) ?? new PlayerView();
@@ -292,7 +185,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     view.bankRemainingMs = seat.bankRemainingMs;
     view.overtimePenalty = 0;
     if (!view.color) {
-      view.color = this.firstAvailableColor(seatIndex, client.sessionId);
+      view.color = pickFirstAvailableColor(this.state.players, client.sessionId, seatIndex);
     }
 
     if (!this.playerViewForSession(client.sessionId)) {
@@ -311,29 +204,13 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     this.broadcastRack(client.sessionId);
   }
 
-  private firstAvailableColor(seatIndex: number, ownSessionId: string): PlayerColorKey {
-    const taken = new Set<string>();
-    for (const p of this.state.players) {
-      if (p.sessionId !== ownSessionId && p.color) taken.add(p.color);
-    }
-    const preferred = defaultColorForSeat(seatIndex);
-    if (!taken.has(preferred)) return preferred;
-    for (const key of PLAYER_COLOR_KEYS) {
-      if (!taken.has(key)) return key;
-    }
-    return preferred;
-  }
-
   private handlePickColor(client: Client, rawPayload: unknown): void {
     const parsed = pickColorSchema.safeParse(rawPayload);
     if (!parsed.success) {
       this.sendError(client, "invalid_color", parsed.error.issues[0]?.message ?? "Invalid color");
       return;
     }
-    if (this.state.started || this.state.phase !== "waiting") {
-      this.sendError(client, "already_started", "Cannot change color after start");
-      return;
-    }
+    if (!this.ensureLobbyOpen(client, "Cannot change color after start")) return;
     const view = this.playerViewForSession(client.sessionId);
     if (!view) {
       this.sendError(client, "no_seat", "No seat for this client");
@@ -353,7 +230,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   private handlePendingUpdate(client: Client, rawPayload: unknown): void {
     const now = Date.now();
     const last = this.lastPendingUpdateAt.get(client.sessionId) ?? 0;
-    if (now - last < 100) return; // silently throttle; client debounces at 100ms
+    if (now - last < MATCH_ROOM_DEFAULTS.pendingUpdateThrottleMs) return;
     this.lastPendingUpdateAt.set(client.sessionId, now);
 
     const parsed = pendingUpdateSchema.safeParse(rawPayload);
@@ -394,30 +271,14 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     }
   }
 
-  private nextAvailableSeatIndex(): number {
-    const taken = new Set<number>();
-    for (const p of this.state.players) taken.add(p.seatIndex);
-    for (let i = 0; i < this.state.maxPlayers; i++) {
-      if (!taken.has(i)) return i;
-    }
-    // Should never happen — onAuth guards against full.
-    return this.state.players.length;
-  }
-
   private handleStartMatch(client: Client, rawPayload: unknown): void {
     const parsed = startMessageSchema.safeParse(rawPayload ?? {});
     if (!parsed.success) {
       this.sendError(client, "invalid_start", "Invalid start payload");
       return;
     }
-    if (this.state.started || this.state.phase !== "waiting") {
-      this.sendError(client, "already_started", "Match already started");
-      return;
-    }
-    if (client.sessionId !== this.state.hostSessionId) {
-      this.sendError(client, "not_host", "Only the host can start the match");
-      return;
-    }
+    if (!this.ensureLobbyOpen(client, "Match already started")) return;
+    if (!this.ensureHost(client, "Only the host can start the match")) return;
     if (this.state.players.length < this.state.minPlayers) {
       this.sendError(
         client,
@@ -436,14 +297,8 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       this.sendError(client, "invalid_time_control", parsed.error.issues[0]?.message ?? "Invalid time control");
       return;
     }
-    if (this.state.started || this.state.phase !== "waiting") {
-      this.sendError(client, "already_started", "Cannot change time control after start");
-      return;
-    }
-    if (client.sessionId !== this.state.hostSessionId) {
-      this.sendError(client, "not_host", "Only the host can change time control");
-      return;
-    }
+    if (!this.ensureLobbyOpen(client, "Cannot change time control after start")) return;
+    if (!this.ensureHost(client, "Only the host can change time control")) return;
     const tc: TimeControl = {
       baseMinutes: parsed.data.baseMinutes,
       incrementSeconds: parsed.data.incrementSeconds,
@@ -456,11 +311,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
 
     // Reset pre-start bank previews on all joined seats.
     const bankMs = minutesToMs(tc.baseMinutes);
-    for (const seat of this.seats.values()) {
-      seat.bankRemainingMs = bankMs;
-      const view = this.playerViewForSession(seat.sessionId);
-      if (view) view.bankRemainingMs = bankMs;
-    }
+    syncSeatBanks(this.seats.values(), (id) => this.playerViewForSession(id), bankMs, false);
   }
 
   override async onLeave(client: Client, code?: number): Promise<void> {
@@ -469,7 +320,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       sessionId: client.sessionId,
       matchId: this.matchId,
       code,
-      consented: code === 1000,
+      consented: code === MATCH_ROOM_DEFAULTS.consentedCloseCode,
     });
     const seat = this.seats.get(client.sessionId);
     if (seat) {
@@ -479,11 +330,11 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     }
 
     // code 1000 = normal closure (consented). Anything else = try reconnect.
-    const consented = code === 1000;
+    const consented = code === MATCH_ROOM_DEFAULTS.consentedCloseCode;
     if (consented) return;
 
     try {
-      await this.allowReconnection(client, RECONNECTION_GRACE_SECONDS);
+      await this.allowReconnection(client, MATCH_ROOM_DEFAULTS.reconnectionGraceSeconds);
       const resumedSeat = this.seats.get(client.sessionId);
       if (resumedSeat) {
         resumedSeat.connected = true;
@@ -520,17 +371,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     this.state.ready = false;
     this.state.started = true;
     const bankMs = minutesToMs(this.state.baseMinutes);
-    for (const seat of this.seats.values()) {
-      seat.bankRemainingMs = bankMs;
-      seat.penaltyScoreTotal = 0;
-      seat.overtimePenalty = 0;
-      const view = this.playerViewForSession(seat.sessionId);
-      if (view) {
-        view.bankRemainingMs = bankMs;
-        view.turnElapsedMs = 0;
-        view.overtimePenalty = 0;
-      }
-    }
+    syncSeatBanks(this.seats.values(), (id) => this.playerViewForSession(id), bankMs, true);
     const ordered = [...this.state.players].sort((a, b) => a.seatIndex - b.seatIndex);
     const playerIds = ordered.map((p) => p.sessionId);
     this.engine = GameEngine.create(playerIds, {
@@ -561,7 +402,10 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
    * time is the natural ceiling on stall attacks. */
   private startClockTicker(): void {
     this.stopClockTicker();
-    const handle = this.clock.setInterval(() => this.onClockTick(), 500);
+    const handle = this.clock.setInterval(
+      () => this.onClockTick(),
+      MATCH_ROOM_DEFAULTS.clockTickIntervalMs,
+    );
     this.clockTickHandle = { clear: () => handle.clear() };
   }
 
@@ -594,34 +438,29 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     if (!view || !seat) return;
 
     const elapsed = Date.now() - this.turnStartedAt;
-    const bankBefore = view.bankRemainingMs;
-    const turnLimit = minutesToMs(this.state.turnMinutes);
-    const allowed = Math.min(turnLimit, bankBefore);
+    const settled = settleTurnState({
+      bankBeforeMs: view.bankRemainingMs,
+      elapsedMs: elapsed,
+      turnMinutes: this.state.turnMinutes,
+      incrementSeconds: this.state.incrementSeconds,
+      previewPenalty,
+    });
 
-    view.bankRemainingMs = Math.max(0, bankBefore - elapsed);
+    view.bankRemainingMs = settled.bankRemainingMs;
     view.turnElapsedMs = 0;
-
-    const overage = Math.max(0, elapsed - allowed);
-    const penalty = previewPenalty(overage);
-    if (penalty > 0) {
-      seat.penaltyScoreTotal += penalty;
-      seat.overtimePenalty = penalty;
-      view.overtimePenalty = penalty;
+    if (settled.penaltyDelta > 0) {
+      seat.penaltyScoreTotal += settled.penaltyDelta;
+      seat.overtimePenalty = settled.overtimePenalty;
+      view.overtimePenalty = settled.overtimePenalty;
     } else {
       seat.overtimePenalty = 0;
       view.overtimePenalty = 0;
-    }
-
-    // Fischer increment: credit the outgoing player after they complete a move.
-    const incrementMs = this.state.incrementSeconds * 1000;
-    if (incrementMs > 0 && view.bankRemainingMs > 0) {
-      view.bankRemainingMs += incrementMs;
     }
   }
 
   private withActionGuard<T>(
     client: Client,
-    schema: z.ZodType<T>,
+    schema: ZodType<T>,
     rawPayload: unknown,
     invalidCode: string,
     invalidMsg: string,
@@ -731,26 +570,15 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     const snap = this.engine.getState();
     if (snap.consecutivePasses < this.engine.getConsecutivePassesLimit()) return;
 
-    const rackValueById = new Map<string, number>();
+    const bonuses = calculateTriggerBBonuses(snap.players);
     for (const p of snap.players) {
-      rackValueById.set(p.id, p.rack.reduce((sum, t) => sum + t.value, 0));
-    }
-    let totalRackValue = 0;
-    for (const v of rackValueById.values()) totalRackValue += v;
-
-    for (const p of snap.players) {
-      const othersRackValue = totalRackValue - (rackValueById.get(p.id) ?? 0);
       const view = this.playerViewForSession(p.id);
-      if (view) view.score += othersRackValue * 2;
+      if (view) view.score += bonuses.get(p.id) ?? 0;
     }
   }
 
   private finalizeWinner(): void {
-    let best: PlayerView | null = null;
-    for (const p of this.state.players) {
-      if (!best || p.score > best.score) best = p;
-    }
-    this.state.winnerSessionId = best?.sessionId ?? "";
+    this.state.winnerSessionId = pickWinnerSessionId(Array.from(this.state.players));
   }
 
   /* ------------------------------------------------------------------ */
@@ -776,36 +604,13 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       currentSessionId: snap.currentPlayerId,
     });
 
-    this.state.turnNumber = snap.turnNumber;
-    this.state.currentSessionId = snap.currentPlayerId;
-    this.state.phase = snap.phase;
-    this.state.isFirstMove = snap.isFirstMove;
-    this.state.consecutivePasses = snap.consecutivePasses;
-    this.state.bagRemaining = snap.tileBag.length;
-    this.state.serverTime = Date.now();
-
-    this.state.board.clear();
-    for (const row of snap.board) {
-      for (const cell of row) this.state.board.push(cellToView(cell));
-    }
-
-    for (const enginePlayer of snap.players) {
-      const view = this.playerViewForSession(enginePlayer.id);
-      const seat = this.seats.get(enginePlayer.id);
-      if (!view) continue;
-      view.score = enginePlayer.score - (seat?.penaltyScoreTotal ?? 0);
-      view.rackCount = enginePlayer.rack.length;
-    }
-
-    const lastMove = new LastMoveView();
-    lastMove.sessionId = ctx.actorSessionId ?? this.state.currentSessionId;
-    lastMove.action = ctx.action;
-    lastMove.scoreDelta = ctx.scoreDelta;
-    lastMove.turnNumber = snap.turnNumber;
-    lastMove.placedIndices = new ArraySchema<number>(
-      ...ctx.placedPositions.map((p) => p.row * this.state.boardSize + p.col),
-    );
-    this.state.lastMove = lastMove;
+    syncFromEngineSnapshot({
+      state: this.state,
+      snapshot: snap,
+      seats: this.seats,
+      playerViewForSession: (sessionId) => this.playerViewForSession(sessionId),
+      ctx,
+    });
   }
 
   private broadcastRack(sessionId: string): void {
@@ -864,7 +669,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   private ensureActionAllowed(client: Client): boolean {
     const now = Date.now();
     const last = this.lastActionAt.get(client.sessionId) ?? 0;
-    if (now - last < RATE_LIMIT_WINDOW_MS) {
+    if (now - last < MATCH_ROOM_DEFAULTS.actionRateLimitWindowMs) {
       this.sendError(client, "rate_limited", "Slow down");
       return false;
     }
@@ -872,10 +677,26 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     return true;
   }
 
+  private ensureLobbyOpen(client: Client, alreadyStartedMsg: string): boolean {
+    if (this.state.started || this.state.phase !== "waiting") {
+      this.sendError(client, "already_started", alreadyStartedMsg);
+      return false;
+    }
+    return true;
+  }
+
+  private ensureHost(client: Client, notHostMsg: string): boolean {
+    if (client.sessionId !== this.state.hostSessionId) {
+      this.sendError(client, "not_host", notHostMsg);
+      return false;
+    }
+    return true;
+  }
+
   private ensureRackRecoveryAllowed(client: Client, reason: string): boolean {
     const now = Date.now();
     const last = this.lastRackRecoveryAt.get(client.sessionId) ?? 0;
-    if (now - last < RACK_RECOVERY_WINDOW_MS) {
+    if (now - last < MATCH_ROOM_DEFAULTS.rackRecoveryWindowMs) {
       roomLog("rackRecovery.throttled", {
         roomId: this.roomId,
         matchId: this.matchId,

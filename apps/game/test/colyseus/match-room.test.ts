@@ -5,7 +5,8 @@ import { boot, type ColyseusTestServer } from "@colyseus/testing";
 import { InviteStore } from "../../src/colyseus/invite-store";
 import { minutesToMs } from "@b-m4th/shared";
 import { MatchRegistry } from "../../src/colyseus/match-registry";
-import { MatchRoom, MATCH_ROOM_NAME } from "../../src/colyseus/match-room";
+import { MatchRoom } from "../../src/colyseus/match-room";
+import { MATCH_ROOM_NAME } from "../../src/colyseus/match-room.config";
 
 let colyseus: ColyseusTestServer;
 let invites: InviteStore;
