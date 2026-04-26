@@ -59,8 +59,6 @@ import {
 const roomLog = createLogger("colyseus.MatchRoom");
 
 export class MatchRoom extends Room<{ state: MatchStateSchema }> {
-  public static onBeforeJoin?: (room: MatchRoom, client: Client, options: JoinOptions) => void;
-
   private matchId: string = "";
   private seed: string = "";
   private invites!: InviteStore;
@@ -84,6 +82,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     this.matches = options.matches;
 
     this.autoDispose = true;
+    this.setSeatReservationTime(this.autoDisposeTimeoutMs);
 
     const record = this.matches?.get(this.matchId);
     const tc = record?.timeControl ?? DEFAULT_TIME_CONTROL;
@@ -148,7 +147,10 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   }
 
   override onJoin(client: Client, options: JoinOptions): void {
-    const role = options.role as "host" | "player";
+    if (options.role !== "host" && options.role !== "player") {
+      throw new Error("Invalid role");
+    }
+    const role = options.role;
     const name = resolveJoinName(options.name);
 
     const seatIndex =

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GAME_CONFIG, VALID_BLANK_ASSIGNMENTS } from "@entities";
+import { GAME_CONFIG, TILE_CONFIGS, VALID_BLANK_ASSIGNMENTS } from "@entities";
 import { PLAYER_COLOR_KEYS } from "@b-m4th/shared";
 import { timeControlSchema } from "./time-control-schema";
 
@@ -9,6 +9,10 @@ const positionSchema = z.object({
 });
 
 const blankAssignmentSchema = z.enum(VALID_BLANK_ASSIGNMENTS);
+const pendingUpdateFaceSet = new Set<string>([
+  ...TILE_CONFIGS.map((tile) => tile.face),
+  ...VALID_BLANK_ASSIGNMENTS,
+]);
 
 const playMoveSchema = z.object({
   tileId: z.string().min(1).max(64),
@@ -41,7 +45,11 @@ const pendingUpdateMoveSchema = z.object({
   tileId: z.string().min(1).max(64),
   row: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),
   col: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),
-  face: z.string().min(1).max(10),
+  face: z
+    .string()
+    .min(1)
+    .max(10)
+    .refine((face) => pendingUpdateFaceSet.has(face), "Invalid tile face"),
   assignedFace: blankAssignmentSchema.optional(),
   value: z.number().int().min(0).max(100),
 });
