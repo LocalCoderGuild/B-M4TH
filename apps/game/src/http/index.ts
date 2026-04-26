@@ -79,6 +79,9 @@ export function createElysiaApp(deps: HttpDeps) {
       }),
     )
     .onError(({ error, code, status }) => {
+      if (code === "VALIDATION" || code === "PARSE") {
+        return status(422, { error: "Invalid request body" });
+      }
       const IS_DEBUG = Bun.env.NODE_ENV !== "production";
       console.error("HTTP unhandled error:", error);
       if (error instanceof Error) {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { createHttpApp, type MatchProvisioner, type SeatReservation } from "../../src/colyseus/http";
+import { createElysiaApp, type MatchProvisioner, type SeatReservation } from "../../src/http";
 import { InviteStore } from "../../src/colyseus/invite-store";
 import { MatchRegistry } from "../../src/colyseus/match-registry";
 
@@ -31,53 +31,39 @@ class StubProvisioner implements MatchProvisioner {
   }
 }
 
-async function req(app: ReturnType<typeof createHttpApp>, init: {
-  method: string;
-  path: string;
-  body?: unknown;
-}): Promise<{ status: number; body: any }> {
-  const response = await new Promise<{ status: number; body: any }>((resolve, reject) => {
-    const server = app.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("Could not bind test server"));
-        return;
-      }
-      const url = `http://127.0.0.1:${address.port}${init.path}`;
-      fetch(url, {
-        method: init.method,
-        headers: init.body ? { "content-type": "application/json" } : undefined,
-        body: init.body ? JSON.stringify(init.body) : undefined,
-      })
-        .then(async (res) => {
-          const text = await res.text();
-          let body: any = text;
-          try {
-            body = JSON.parse(text);
-          } catch {
-            /* non-json ok */
-          }
-          resolve({ status: res.status, body });
-        })
-        .catch(reject)
-        .finally(() => server.close());
-    });
-  });
-  return response;
+async function req(
+  app: ReturnType<typeof createElysiaApp>,
+  init: { method: string; path: string; body?: unknown },
+): Promise<{ status: number; body: any }> {
+  const url = `http://localhost${init.path}`;
+  const response = await app.handle(
+    new Request(url, {
+      method: init.method,
+      headers: init.body ? { "content-type": "application/json" } : undefined,
+      body: init.body ? JSON.stringify(init.body) : undefined,
+    }),
+  );
+  const text = await response.text();
+  let body: any = text;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    /* non-json ok */
+  }
+  return { status: response.status, body };
 }
 
 describe("HTTP API", () => {
   let invites: InviteStore;
   let matches: MatchRegistry;
   let provisioner: StubProvisioner;
-  let app: ReturnType<typeof createHttpApp>;
+  let app: ReturnType<typeof createElysiaApp>;
 
   beforeEach(() => {
     invites = new InviteStore({ sweepIntervalMs: 0 });
     matches = new MatchRegistry();
     provisioner = new StubProvisioner();
-    app = createHttpApp({
+    app = createElysiaApp({
       invites,
       matches,
       provisioner,
@@ -139,7 +125,7 @@ describe("HTTP API", () => {
       path: "/api/matches",
       body: { hostName: "   " },
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   test("GET /api/invites/:token peeks without consuming", async () => {

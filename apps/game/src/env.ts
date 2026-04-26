@@ -9,9 +9,10 @@ export const env = z
 
     PUBLIC_ENGINE_URL: z.string().optional(),
     PUBLIC_API_URL: z.string().optional(),
-    PUBLIC_BASE_URL: z.string(),
+    PUBLIC_BASE_URL: z.string().optional(),
 
-    CLIENT_ORIGIN: z.string(),
-    NODE_ENV: z.enum(["production", "development"]).default("production"),
+    CLIENT_ORIGIN: z.string().optional(),
+    // enum(["production", "development"])
+    NODE_ENV: z.string().default("production"),
   })
   .parse(Bun.env);

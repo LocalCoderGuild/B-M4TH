@@ -1,6 +1,4 @@
-import { createServer } from "node:http";
 import { Server, matchMaker } from "colyseus";
-import { WebSocketTransport } from "@colyseus/ws-transport";
 import { BunWebSockets } from "@colyseus/bun-websockets";
 import {
   createElysiaApp,
@@ -13,7 +11,8 @@ import { MatchRoom, MATCH_ROOM_NAME } from "./match-room";
 import { env } from "src/env";
 
 export interface BootstrapOptions {
-  port?: number;
+  enginePort?: number;
+  apiPort?: number;
   host?: string;
   clientOrigin?: string;
   publicBaseUrl?: string;
@@ -75,7 +74,7 @@ export async function bootstrap(opts: BootstrapOptions = {}): Promise<{
   gameServer.define(MATCH_ROOM_NAME, MatchRoom, { invites, matches } as any);
 
   const engineServer: TServerInfo = {
-    port: env.ENGINE_PORT,
+    port: opts.enginePort ?? env.ENGINE_PORT,
     host: env.ENGINE_HOST,
     baseURL: env.PUBLIC_ENGINE_URL ?? env.ENGINE_HOST,
   };
@@ -90,17 +89,18 @@ export async function bootstrap(opts: BootstrapOptions = {}): Promise<{
   );
 
   const apiServer: TServerInfo = {
-    port: env.API_PORT,
+    port: opts.apiPort ?? env.API_PORT,
     host: env.API_HOST,
     baseURL: env.PUBLIC_API_URL ?? env.ENGINE_HOST,
   };
 
   const elysia = createElysiaApp(deps);
   elysia.listen({ hostname: apiServer.host, port: apiServer.port });
+  const actualApiPort = elysia.server?.port ?? apiServer.port;
 
   return {
     engineServer,
-    apiServer,
+    apiServer: { ...apiServer, port: actualApiPort },
     close: async () => {
       await gameServer.gracefullyShutdown(false);
     },
