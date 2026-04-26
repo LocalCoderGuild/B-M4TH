@@ -501,8 +501,13 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
         if (view) view.connected = true;
         this.broadcastRack(client.sessionId);
       }
-    } catch {
-      // Reconnection window expired. Keep seat in state but marked disconnected.
+    } catch (err) {
+      roomLog("reconnectionExpired", {
+        roomId: this.roomId,
+        matchId: this.matchId,
+        sessionId: client.sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Server, matchMaker } from "colyseus";
-import { WebSocketTransport } from "@colyseus/ws-transport";
+import { BunWebSockets } from "@colyseus/bun-websockets";
 import { boot, type ColyseusTestServer } from "@colyseus/testing";
 import { InviteStore } from "../../src/colyseus/invite-store";
 import { minutesToMs } from "@b-m4th/shared";
@@ -14,7 +14,7 @@ let matches: MatchRegistry;
 beforeAll(async () => {
   invites = new InviteStore({ sweepIntervalMs: 0 });
   matches = new MatchRegistry({ sweepIntervalMs: 0 });
-  const server = new Server({ transport: new WebSocketTransport({ server: undefined as any }) });
+  const server = new Server({ transport: new BunWebSockets({}) });
   server.define(MATCH_ROOM_NAME, MatchRoom, { invites, matches } as any);
   colyseus = await boot(server);
 });

@@ -11,6 +11,7 @@ import { Board } from "@engine/board";
 import { GameEngine } from "@engine/game-engine";
 import { TurnManager } from "@engine/turn-manager";
 import { posKey } from "@engine/pos-key";
+import { ALL_OPERATOR_FACES } from "@b-m4th/shared";
 
 const PREMIUM_SYMBOL: Record<BoardCell["premium"], string> = {
   normal: ".",
@@ -20,7 +21,9 @@ const PREMIUM_SYMBOL: Record<BoardCell["premium"], string> = {
   "3x_eq": "R",
 };
 
-const OPERATOR_FACES = ["+", "-", "×", "÷"] as const;
+const ARITHMETIC_FACES = ALL_OPERATOR_FACES.filter(
+  (f): f is "+" | "-" | "×" | "÷" => f !== "=",
+);
 
 interface ParsedArgs {
   seed: string;
@@ -195,7 +198,7 @@ function makeOperatorOptions(rack: Tile[]): SymbolOption[] {
   const options: SymbolOption[] = [];
   for (const tile of rack) {
     const face = faceOf(tile);
-    if (OPERATOR_FACES.includes(face as (typeof OPERATOR_FACES)[number])) {
+    if (ARITHMETIC_FACES.includes(face as (typeof ARITHMETIC_FACES)[number])) {
       options.push({ tileId: tile.id, face });
       continue;
     }
@@ -210,7 +213,7 @@ function makeOperatorOptions(rack: Tile[]): SymbolOption[] {
       continue;
     }
     if (tile.face === "BLANK") {
-      for (const op of OPERATOR_FACES) {
+      for (const op of ARITHMETIC_FACES) {
         options.push({ tileId: tile.id, face: op, assignedFace: op });
       }
     }

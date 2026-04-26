@@ -1,3 +1,6 @@
+export { ALL_OPERATOR_FACES } from "@b-m4th/shared";
+export type { OperatorFace } from "@b-m4th/shared";
+
 export type TileType = "number" | "operator" | "blank";
 
 export const VALID_BLANK_ASSIGNMENTS = [

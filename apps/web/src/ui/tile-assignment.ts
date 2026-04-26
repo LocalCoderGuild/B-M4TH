@@ -8,14 +8,15 @@ export interface AssignmentGroup {
   options: string[];
 }
 
+import { ALL_OPERATOR_FACES } from "@b-m4th/shared";
+
 const DIGIT_FACES = Array.from({ length: 21 }, (_, i) => String(i));
-const OPERATOR_FACES = ["+", "-", "×", "÷", "="];
 
 export function getAssignmentGroups(face: string): AssignmentGroup[] | null {
   if (face === "BLANK") {
     return [
       { label: "Numbers", options: DIGIT_FACES },
-      { label: "Operators", options: OPERATOR_FACES },
+      { label: "Operators", options: [...ALL_OPERATOR_FACES] },
     ];
   }
   if (face === "+/-") {
