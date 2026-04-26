@@ -1,6 +1,11 @@
 import { notifications } from "@mantine/notifications";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import {
+  DISPLAY_NAME_MAX_LENGTH,
+  displayNameErrorMessage,
+  validateDisplayName,
+} from "@b-m4th/shared";
 import { claimInvite, peekInvite } from "../api/client";
 import { joinFromClaim } from "../net/colyseus";
 import type { InvitePeekResponse } from "../types";
@@ -24,15 +29,15 @@ export function InvitePage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = name.trim();
-    if (trimmed.length === 0) {
-      setNameErr("Enter a name");
+    const parsedName = validateDisplayName(name);
+    if (!parsedName.ok) {
+      setNameErr(displayNameErrorMessage(parsedName.error));
       return;
     }
     setNameErr(null);
     setJoining(true);
     try {
-      const claim = await claimInvite(token, trimmed);
+      const claim = await claimInvite(token, parsedName.value);
       await joinFromClaim(claim);
       navigate(`/room/${claim.matchId}`, { replace: true });
     } catch (err) {
@@ -96,7 +101,7 @@ export function InvitePage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Bob"
-              maxLength={40}
+              maxLength={DISPLAY_NAME_MAX_LENGTH}
               autoFocus
             />
           </label>

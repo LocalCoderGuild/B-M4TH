@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { PLAYER_COLOR_KEYS, defaultColorForSeat } from "@b-m4th/shared";
+import type { PlayerColorKey } from "@b-m4th/shared";
 export { PLAYER_COLOR_KEYS, defaultColorForSeat };
 export type { PlayerColorKey } from "@b-m4th/shared";
 

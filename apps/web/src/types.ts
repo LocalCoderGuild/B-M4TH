@@ -1,4 +1,12 @@
-export type { TileDto, PlayerDto, LastMoveDto, MatchStateDto, BoardCellDto } from "@b-m4th/shared";
+import type {
+  TileDto,
+  PlayerDto,
+  LastMoveDto,
+  MatchStateDto,
+  BoardCellDto,
+} from "@b-m4th/shared";
+
+export type { TileDto, PlayerDto, LastMoveDto, MatchStateDto, BoardCellDto };
 
 export type Role = "host" | "player";
 /** @deprecated kept for lingering references — use Role. */

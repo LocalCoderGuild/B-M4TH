@@ -13,7 +13,13 @@ import {
 } from "@entities";
 import { InviteStore } from "./invite-store";
 import { posKey } from "@engine/pos-key";
-import { minutesToMs, PLAYER_COLOR_KEYS, defaultColorForSeat, createLogger } from "@b-m4th/shared";
+import {
+  minutesToMs,
+  PLAYER_COLOR_KEYS,
+  defaultColorForSeat,
+  createLogger,
+  validateDisplayName,
+} from "@b-m4th/shared";
 import type { PlayerColorKey } from "@b-m4th/shared";
 import { MatchRegistry } from "./match-registry";
 import { timeControlSchema } from "./schemas/time-control-schema";
@@ -230,8 +236,9 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     if (options?.role !== "host" && options?.role !== "player") {
       throw new Error("Invalid role");
     }
-    if (typeof options.name !== "string" || options.name.trim().length === 0) {
-      throw new Error("Missing player name");
+    const parsedName = validateDisplayName(options.name);
+    if (!parsedName.ok) {
+      throw new Error("Invalid player name");
     }
     if (this.state.started) {
       throw new Error("Match already started");
@@ -247,7 +254,8 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
 
   override onJoin(client: Client, options: JoinOptions): void {
     const role = options.role as "host" | "player";
-    const name = (options.name ?? "Player").trim().slice(0, 40);
+    const parsedName = validateDisplayName(options.name);
+    const name = parsedName.ok ? parsedName.value : "Player";
 
     const seatIndex =
       role === "host" ? 0 : this.nextAvailableSeatIndex();

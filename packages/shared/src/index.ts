@@ -13,3 +13,12 @@ export type {
 export { PLAYER_COLOR_KEYS, defaultColorForSeat } from "./colors";
 export type { PlayerColorKey } from "./colors";
 export { createLogger } from "./logger";
+export {
+  DISPLAY_NAME_MAX_LENGTH,
+  validateDisplayName,
+  displayNameErrorMessage,
+} from "./validation";
+export type {
+  DisplayNameValidationError,
+  DisplayNameValidationResult,
+} from "./validation";

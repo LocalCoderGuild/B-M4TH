@@ -141,16 +141,9 @@ export class GameEngine {
     };
   }
 
-  play(
+  private validateAndPreparePlay(
     moves: Array<{ tileId: string; position: Position; assignedFace?: BlankAssignment }>,
-  ): GameActionResult {
-    if (this.phase !== "playing") {
-      return { ok: false, error: "Game is not in playing phase" };
-    }
-    if (moves.length === 0) {
-      return { ok: false, error: "No tiles selected for play" };
-    }
-
+  ): { ok: true; placements: Placement[] } | { ok: false; error: string } {
     const player = this.players[this.currentPlayerIndex]!;
     const byId = new Map(player.rack.map((t) => [t.id, t] as const));
     const seen = new Set<string>();
@@ -165,26 +158,40 @@ export class GameEngine {
       if (!tile) {
         return { ok: false, error: `Tile not in current player's rack: ${move.tileId}` };
       }
-      const placedTile =
-        move.assignedFace !== undefined
-          ? assignTile(tile, move.assignedFace)
-          : tile;
-      placements.push({ tile: placedTile, position: move.position });
+      placements.push({
+        tile: move.assignedFace !== undefined ? assignTile(tile, move.assignedFace) : tile,
+        position: move.position,
+      });
     }
 
-    const placedPositions: Position[] = [];
+    const placed: Position[] = [];
     try {
       for (const p of placements) {
         this.board.placeTile(p.position, p.tile);
-        placedPositions.push(p.position);
+        placed.push(p.position);
       }
     } catch (e) {
-      for (const pos of placedPositions) {
-        this.board.removeTile(pos);
-      }
-      const message = e instanceof Error ? e.message : "Failed to place tiles";
-      return { ok: false, error: message };
+      for (const pos of placed) this.board.removeTile(pos);
+      return { ok: false, error: e instanceof Error ? e.message : "Failed to place tiles" };
     }
+
+    return { ok: true, placements };
+  }
+
+  play(
+    moves: Array<{ tileId: string; position: Position; assignedFace?: BlankAssignment }>,
+  ): GameActionResult {
+    if (this.phase !== "playing") {
+      return { ok: false, error: "Game is not in playing phase" };
+    }
+    if (moves.length === 0) {
+      return { ok: false, error: "No tiles selected for play" };
+    }
+
+    const prepared = this.validateAndPreparePlay(moves);
+    if (!prepared.ok) return prepared;
+    const { placements } = prepared;
+    const player = this.players[this.currentPlayerIndex]!;
 
     const validated: PlayAndScoreResult = TurnManager.validateAndScorePlay(
       this.board,
@@ -239,32 +246,10 @@ export class GameEngine {
     if (moves.length === 0) {
       return { ok: true, score: 0 };
     }
-    const player = this.players[this.currentPlayerIndex]!;
-    const byId = new Map(player.rack.map((t) => [t.id, t] as const));
-    const seen = new Set<string>();
-    const placements: Placement[] = [];
-    for (const move of moves) {
-      if (seen.has(move.tileId)) {
-        return { ok: false, error: `Duplicate tile id: ${move.tileId}` };
-      }
-      seen.add(move.tileId);
-      const tile = byId.get(move.tileId);
-      if (!tile) {
-        return { ok: false, error: `Tile not in rack: ${move.tileId}` };
-      }
-      const placedTile = move.assignedFace !== undefined ? assignTile(tile, move.assignedFace) : tile;
-      placements.push({ tile: placedTile, position: move.position });
-    }
-    const placed: Position[] = [];
-    try {
-      for (const p of placements) {
-        this.board.placeTile(p.position, p.tile);
-        placed.push(p.position);
-      }
-    } catch (e) {
-      for (const pos of placed) this.board.removeTile(pos);
-      return { ok: false, error: e instanceof Error ? e.message : "Failed to place tiles" };
-    }
+    const prepared = this.validateAndPreparePlay(moves);
+    if (!prepared.ok) return prepared;
+    const { placements } = prepared;
+
     const result = TurnManager.validateAndScorePlay(this.board, placements, this.isFirstMove);
     for (const p of placements) this.board.removeTile(p.position);
     if (!result.ok) return { ok: false, error: result.error };

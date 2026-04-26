@@ -2,6 +2,10 @@ import { Elysia } from "elysia";
 import { cors } from "@elysia/cors";
 
 import { z } from "zod";
+import {
+  displayNameErrorMessage,
+  validateDisplayName,
+} from "@b-m4th/shared";
 import { MAX_PLAYERS, MIN_PLAYERS } from "@entities";
 import { InviteStore } from "../colyseus/invite-store";
 import { MatchRegistry } from "../colyseus/match-registry";
@@ -37,14 +41,26 @@ export interface HttpDeps {
 
 const timeControlBody = timeControlSchema.optional();
 
+const displayNameSchema = z.unknown().transform((value, ctx) => {
+  const parsed = validateDisplayName(value);
+  if (!parsed.ok) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: displayNameErrorMessage(parsed.error),
+    });
+    return z.NEVER;
+  }
+  return parsed.value;
+});
+
 const createMatchBody = z.object({
-  hostName: z.string().trim().min(1).max(40),
+  hostName: displayNameSchema,
   timeControl: timeControlBody,
   maxPlayers: z.number().int().min(MIN_PLAYERS).max(MAX_PLAYERS).optional(),
 });
 
 const claimBody = z.object({
-  name: z.string().trim().min(1).max(40),
+  name: displayNameSchema,
 });
 
 function buildLink(baseUrl: string, token: string): string {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { SoundManager } from "../audio/SoundManager";
 import { useMatchStore, type MatchSnapshot } from "../store/match-store";
-import { getPlayerPaletteByKey, isHexColor } from "../ui/player-colors";
+import { getColorHex } from "../ui/player-colors";
 import { BoardScene } from "./board-scene";
 import { needsAssignment } from "../ui/tile-assignment";
 import { BOARD_SIZE, EVENTS } from "../constants";
@@ -124,14 +124,8 @@ export function BoardCanvas() {
           );
 
           const colorHex = actor
-            ? isHexColor(actor.color)
-              ? actor.color
-              : getPlayerPaletteByKey(actor.color).color
-            : "#ffd45c";
-
-          // const colorHex = actor
-          //   ? getPlayerPaletteByKey(actor.color).color
-          //   : "#ffd45c";
+            ? getColorHex(actor.color, actor.seatIndex)
+            : getColorHex(null, 0);
 
           sceneRef.current?.renderLastMove(placed, colorHex);
           if (prevTurn !== nextTurn) {
@@ -155,8 +149,8 @@ export function BoardCanvas() {
           (p) => p.sessionId === activeId,
         );
         const colorHex = activePalette
-          ? getPlayerPaletteByKey(activePalette.color).color
-          : "#35f0d0";
+          ? getColorHex(activePalette.color, activePalette.seatIndex)
+          : getColorHex(null, 1);
         sceneRef.current?.renderOpponentPending(
           state.opponentPending,
           colorHex,

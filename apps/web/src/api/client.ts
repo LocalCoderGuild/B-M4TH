@@ -18,9 +18,19 @@ async function json<T>(res: Response): Promise<T> {
     let detail = "";
     try {
       const body = await res.json();
-      detail = body?.error ?? body?.message ?? JSON.stringify(body);
-    } catch {
-      detail = await res.text().catch(() => `Request failed (${res.status})`);
+      detail = body?.error ?? body?.message ?? "";
+    } catch (err) {
+      clientLog("http.error.parse_failed", {
+        status: res.status,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      detail = await res.text().catch((textErr) => {
+        clientLog("http.error.read_text_failed", {
+          status: res.status,
+          error: textErr instanceof Error ? textErr.message : String(textErr),
+        });
+        return `Request failed (${res.status})`;
+      });
     }
     throw new Error(detail || `Request failed (${res.status})`);
   }

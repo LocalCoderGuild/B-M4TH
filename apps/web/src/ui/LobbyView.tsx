@@ -90,7 +90,7 @@ export function LobbyView() {
   const myColorKey: PlayerColorKey | null = me && !myColorIsCustomHex
     ? resolvePlayerColorKey(me.color, me.seatIndex)
     : null;
-  const myColorHex = me ? getColorHex(me.color, me.seatIndex) : "#d76a2d";
+  const myColorHex = getColorHex(me?.color ?? null, me?.seatIndex ?? 0);
   const takenByOthers = new Set<string>();
   for (const p of snapshot?.players ?? []) {
     if (p.sessionId !== mySessionId && p.color) takenByOthers.add(p.color);

@@ -1,6 +1,11 @@
 import { notifications } from "@mantine/notifications";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  DISPLAY_NAME_MAX_LENGTH,
+  displayNameErrorMessage,
+  validateDisplayName,
+} from "@b-m4th/shared";
 import { createMatch } from "../api/client";
 import { joinHostReservation } from "../net/colyseus";
 import { useMatchStore } from "../store/match-store";
@@ -16,19 +21,15 @@ export function HomePage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = hostName.trim();
-    if (trimmed.length === 0) {
-      setError("Enter a name");
-      return;
-    }
-    if (trimmed.length > 40) {
-      setError("Too long");
+    const parsedName = validateDisplayName(hostName);
+    if (!parsedName.ok) {
+      setError(displayNameErrorMessage(parsedName.error));
       return;
     }
     setError(null);
     setSubmitting(true);
     try {
-      const match = await createMatch(trimmed, { maxPlayers });
+      const match = await createMatch(parsedName.value, { maxPlayers });
       await joinHostReservation(match.hostReservation);
       useMatchStore.getState().setGuestInviteLink(match.inviteLink);
       navigate(`/room/${match.matchId}`, { replace: true });
@@ -62,7 +63,7 @@ export function HomePage() {
               value={hostName}
               onChange={(e) => setHostName(e.target.value)}
               placeholder="e.g. Alice"
-              maxLength={40}
+              maxLength={DISPLAY_NAME_MAX_LENGTH}
               autoFocus
             />
           </label>

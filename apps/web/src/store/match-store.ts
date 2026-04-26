@@ -1,10 +1,10 @@
 import { create } from "zustand";
 import type { ErrorMessage, PendingPlacement, Phase, TileDto } from "../types";
 import type {
-  BoardCellDto,
-  PlayerDto,
-  LastMoveDto,
-  MatchStateDto,
+  BoardCellDto as BoardCellView,
+  PlayerDto as PlayerSnapshot,
+  LastMoveDto as LastMoveSnapshot,
+  MatchStateDto as MatchSnapshot,
 } from "@b-m4th/shared";
 
 export interface TurnLogEntry {
@@ -17,10 +17,7 @@ export interface TurnLogEntry {
   scoreDelta: number;
 }
 
-export type { BoardCellDto as BoardCellView } from "@b-m4th/shared";
-export type { PlayerDto as PlayerSnapshot } from "@b-m4th/shared";
-export type { LastMoveDto as LastMoveSnapshot } from "@b-m4th/shared";
-export type { MatchStateDto as MatchSnapshot } from "@b-m4th/shared";
+export type { BoardCellView, PlayerSnapshot, LastMoveSnapshot, MatchSnapshot };
 
 export interface DragState {
   tileId: string | null;
