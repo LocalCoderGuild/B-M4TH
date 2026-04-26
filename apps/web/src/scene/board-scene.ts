@@ -313,38 +313,40 @@ export class BoardScene {
     const size = this.cellSize - 4;
     const offset = 2;
     const displayFace = (p.assignedFace && p.assignedFace.length > 0) ? p.assignedFace : p.face;
+
+    // Same structure as makeTileGraphic(ghost: false) — solid tile style — but
+    // coloured with the opponent's player colour instead of gold.
     const bg = new Graphics();
     bg.rect(offset, offset, size, size)
-      .fill({ color: colorNum, alpha: 0.18 })
-      .stroke({ width: 3, color: colorNum, alpha: 0.7 });
+      .fill({ color: colorNum, alpha: 1 });
     bg.rect(offset + 4, offset + 4, Math.max(1, size - 8), Math.max(1, size - 8))
-      .stroke({ width: 1, color: 0xffffff, alpha: 0.12 });
+      .stroke({ width: 1, color: 0xffffff, alpha: 0.28 });
     bg.eventMode = "none";
     container.addChild(bg);
+
     const faceStyle = new TextStyle({
       fontFamily: "\"Press Start 2P\", monospace",
       fontSize: Math.max(10, Math.floor(size * 0.42)),
       fill: 0xffffff,
       fontWeight: "400",
-      dropShadow: { color: 0x050816, blur: 0, distance: 1, alpha: 0.9 },
+      dropShadow: { color: 0x050816, blur: 0, distance: 1, alpha: 1 },
     });
     const faceText = new Text({ text: displayFace, style: faceStyle });
     faceText.anchor.set(0.5);
     faceText.position.set(this.cellSize / 2, this.cellSize / 2);
-    faceText.alpha = 0.8;
     faceText.eventMode = "none";
     container.addChild(faceText);
+
     if (p.value > 0) {
       const valStyle = new TextStyle({
         fontFamily: "\"Press Start 2P\", monospace",
         fontSize: Math.max(6, Math.floor(size * 0.16)),
-        fill: 0xccddff,
+        fill: 0xffffff,
         fontWeight: "400",
       });
       const valText = new Text({ text: String(p.value), style: valStyle });
       valText.anchor.set(1, 1);
       valText.position.set(this.cellSize - 4, this.cellSize - 4);
-      valText.alpha = 0.7;
       valText.eventMode = "none";
       container.addChild(valText);
     }
@@ -441,12 +443,9 @@ export class BoardScene {
     const offset = 2;
     const bg = new Graphics();
     bg.rect(offset, offset, size, size)
-      .fill({ color: ghost ? 0x24325d : 0xffd45c, alpha: ghost ? 0.78 : 1 })
-      .stroke({ width: 3, color: ghost ? 0x35f0d0 : 0x050816 });
+      .fill({ color: ghost ? 0x24325d : 0xffd45c, alpha: ghost ? 0.78 : 1 });
     bg.rect(offset + 4, offset + 4, Math.max(1, size - 8), Math.max(1, size - 8))
       .stroke({ width: 1, color: 0xffffff, alpha: ghost ? 0.16 : 0.28 });
-    bg.rect(offset + 3, offset + size - 7, Math.max(1, size - 6), 3)
-      .fill({ color: ghost ? 0x35f0d0 : 0xd78322, alpha: ghost ? 0.35 : 0.42 });
     bg.eventMode = "none";
     container.addChild(bg);
 
