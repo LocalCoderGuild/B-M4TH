@@ -6,6 +6,7 @@ import {
   MIN_PLAYERS,
   type TimeControl,
 } from "@entities";
+import { TtlMap, type TtlMapOptions } from "./ttl-map";
 
 export interface MatchRecord {
   matchId: string;
@@ -18,11 +19,7 @@ export interface MatchRecord {
   minPlayers: number;
 }
 
-export interface MatchRegistryOptions {
-  ttlMs?: number;
-  sweepIntervalMs?: number;
-  now?: () => number;
-}
+export type MatchRegistryOptions = TtlMapOptions & { ttlMs?: number };
 export { DEFAULT_TIME_CONTROL, MAX_PLAYERS, MIN_PLAYERS };
 export type { TimeControl };
 
@@ -34,20 +31,9 @@ function mintSeed(): string {
   return randomBytes(16).toString("base64url");
 }
 
-export class MatchRegistry {
-  private readonly matches = new Map<string, MatchRecord>();
-  private readonly ttlMs: number;
-  private readonly now: () => number;
-  private sweepTimer?: ReturnType<typeof setInterval>;
-
+export class MatchRegistry extends TtlMap<MatchRecord> {
   constructor(opts: MatchRegistryOptions = {}) {
-    this.ttlMs = opts.ttlMs ?? MATCH_TTL_MS;
-    this.now = opts.now ?? Date.now;
-    const interval = opts.sweepIntervalMs ?? 5 * 60 * 1000;
-    if (interval > 0 && typeof setInterval === "function") {
-      this.sweepTimer = setInterval(() => this.sweep(), interval);
-      this.sweepTimer.unref?.();
-    }
+    super(opts.ttlMs ?? MATCH_TTL_MS, opts);
   }
 
   create(
@@ -66,54 +52,27 @@ export class MatchRegistry {
       maxPlayers: clampedMax,
       minPlayers: MIN_PLAYERS,
     };
-    this.matches.set(record.matchId, record);
+    this.set(record.matchId, record);
     return record;
   }
 
   get(matchId: string): MatchRecord | null {
-    const record = this.matches.get(matchId);
-    if (!record) return null;
-    if (this.now() - record.createdAt > this.ttlMs) {
-      this.matches.delete(matchId);
-      return null;
-    }
-    return record;
+    return this.getEntry(matchId);
   }
 
   bindRoom(matchId: string, roomId: string): void {
-    const record = this.matches.get(matchId);
+    const record = this.getEntry(matchId);
     if (!record) return;
     record.roomId = roomId;
   }
 
   updateTimeControl(matchId: string, timeControl: TimeControl): void {
-    const record = this.matches.get(matchId);
+    const record = this.getEntry(matchId);
     if (!record) return;
     record.timeControl = { ...timeControl };
   }
 
   remove(matchId: string): void {
-    this.matches.delete(matchId);
-  }
-
-  sweep(): number {
-    const cutoff = this.now();
-    let removed = 0;
-    for (const [matchId, record] of this.matches) {
-      if (cutoff - record.createdAt > this.ttlMs) {
-        this.matches.delete(matchId);
-        removed++;
-      }
-    }
-    return removed;
-  }
-
-  size(): number {
-    return this.matches.size;
-  }
-
-  dispose(): void {
-    if (this.sweepTimer) clearInterval(this.sweepTimer);
-    this.matches.clear();
+    this.deleteEntry(matchId);
   }
 }

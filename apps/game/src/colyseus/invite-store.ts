@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { TtlMap, type TtlMapOptions } from "./ttl-map";
 
 export interface Invite {
   token: string;
@@ -6,33 +7,17 @@ export interface Invite {
   expiresAt: number;
 }
 
-export interface InviteStoreOptions {
-  ttlMs?: number;
-  sweepIntervalMs?: number;
-  now?: () => number;
-}
+export type InviteStoreOptions = TtlMapOptions & { ttlMs?: number };
 
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
-const DEFAULT_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 function mintToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
-export class InviteStore {
-  private readonly invites = new Map<string, Invite>();
-  private readonly ttlMs: number;
-  private readonly now: () => number;
-  private sweepTimer?: ReturnType<typeof setInterval>;
-
+export class InviteStore extends TtlMap<Invite> {
   constructor(opts: InviteStoreOptions = {}) {
-    this.ttlMs = opts.ttlMs ?? DEFAULT_TTL_MS;
-    this.now = opts.now ?? Date.now;
-    const interval = opts.sweepIntervalMs ?? DEFAULT_SWEEP_INTERVAL_MS;
-    if (interval > 0 && typeof setInterval === "function") {
-      this.sweepTimer = setInterval(() => this.sweep(), interval);
-      this.sweepTimer.unref?.();
-    }
+    super(opts.ttlMs ?? DEFAULT_TTL_MS, opts);
   }
 
   /** Mint a multi-use invite for a match. Remains valid until TTL, the match
@@ -45,18 +30,13 @@ export class InviteStore {
       matchId,
       expiresAt: this.now() + this.ttlMs,
     };
-    this.invites.set(token, invite);
+    this.set(token, invite);
     return invite;
   }
 
   peek(token: string): Invite | null {
-    const invite = this.invites.get(token);
-    if (!invite) return null;
-    if (invite.expiresAt <= this.now()) {
-      this.invites.delete(token);
-      return null;
-    }
-    return { ...invite };
+    const invite = this.getEntry(token);
+    return invite ? { ...invite } : null;
   }
 
   /** Non-destructive claim: returns the invite if still valid. Callers invalidate
@@ -66,33 +46,12 @@ export class InviteStore {
   }
 
   revoke(token: string): void {
-    this.invites.delete(token);
+    this.deleteEntry(token);
   }
 
   revokeMatch(matchId: string): void {
-    for (const [token, invite] of this.invites) {
-      if (invite.matchId === matchId) this.invites.delete(token);
+    for (const [token, entry] of this.store) {
+      if (entry.value.matchId === matchId) this.store.delete(token);
     }
-  }
-
-  sweep(): number {
-    const cutoff = this.now();
-    let removed = 0;
-    for (const [token, invite] of this.invites) {
-      if (invite.expiresAt <= cutoff) {
-        this.invites.delete(token);
-        removed++;
-      }
-    }
-    return removed;
-  }
-
-  size(): number {
-    return this.invites.size;
-  }
-
-  dispose(): void {
-    if (this.sweepTimer) clearInterval(this.sweepTimer);
-    this.invites.clear();
   }
 }
