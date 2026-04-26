@@ -1,3 +1,5 @@
+import { clamp } from "@b-m4th/shared";
+
 export type SoundCue =
   | "cell-select"
   | "entry-correct"
@@ -24,7 +26,7 @@ class SoundManagerImpl {
       try {
         const parsed = JSON.parse(raw) as Partial<SoundSettings>;
         this.enabled = parsed.enabled ?? this.enabled;
-        this.volume = clampVolume(parsed.volume ?? this.volume);
+        this.volume = clamp(parsed.volume ?? this.volume, 0, 1);
       } catch {
         localStorage.removeItem(STORAGE_KEY);
       }
@@ -34,7 +36,7 @@ class SoundManagerImpl {
 
   configure(settings: Partial<SoundSettings>): SoundSettings {
     this.enabled = settings.enabled ?? this.enabled;
-    this.volume = clampVolume(settings.volume ?? this.volume);
+    this.volume = clamp(settings.volume ?? this.volume, 0, 1);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings()));
     return this.settings();
   }
@@ -108,14 +110,10 @@ class SoundManagerImpl {
   }
 }
 
-function clampVolume(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
+export const SoundManager = new SoundManagerImpl();
 
 declare global {
   interface Window {
     webkitAudioContext?: typeof AudioContext;
   }
 }
-
-export const SoundManager = new SoundManagerImpl();

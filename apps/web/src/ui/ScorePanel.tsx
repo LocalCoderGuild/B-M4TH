@@ -1,5 +1,6 @@
 import { useMatchStore } from "../store/match-store";
 import { getPlayerColorVars } from "./player-colors";
+import { minutesToMs } from "@b-m4th/shared";
 
 function formatMs(ms: number): string {
   const clamped = Math.max(0, ms);
@@ -21,8 +22,8 @@ export function ScorePanel() {
     );
   }
 
-  const bankTotalMs = Math.max(1, snapshot.baseMinutes) * 60 * 1000;
-  const turnLimitMs = Math.max(1, snapshot.turnMinutes) * 60 * 1000;
+  const bankTotalMs = minutesToMs(Math.max(1, snapshot.baseMinutes));
+  const turnLimitMs = minutesToMs(Math.max(1, snapshot.turnMinutes));
   const ordered = [...snapshot.players].sort((a, b) => a.seatIndex - b.seatIndex);
 
   return (

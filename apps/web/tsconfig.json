@@ -15,7 +15,10 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@b-m4th/shared": ["../../packages/shared/src"]
+    }
   },
   "include": ["src", "vite-env.d.ts"],
   "references": []

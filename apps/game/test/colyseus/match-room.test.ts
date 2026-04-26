@@ -3,6 +3,7 @@ import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { boot, type ColyseusTestServer } from "@colyseus/testing";
 import { InviteStore } from "../../src/colyseus/invite-store";
+import { minutesToMs } from "@b-m4th/shared";
 import { MatchRegistry } from "../../src/colyseus/match-registry";
 import { MatchRoom, MATCH_ROOM_NAME } from "../../src/colyseus/match-room";
 
@@ -255,7 +256,7 @@ describe("MatchRoom integration", () => {
       await new Promise((r) => setTimeout(r, 25));
     }
     const firstPlayer = host.state.currentSessionId;
-    const baseBankMs = host.state.baseMinutes * 60 * 1000;
+    const baseBankMs = minutesToMs(host.state.baseMinutes);
     const initialBank = host.state.players.find((p) => p.sessionId === firstPlayer)?.bankRemainingMs;
     expect(initialBank).toBe(baseBankMs);
 

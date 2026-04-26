@@ -25,7 +25,8 @@
       "@entities": ["src/entities"],
       "@entities/*": ["src/entities/*"],
       "@engine": ["src/engine"],
-      "@engine/*": ["src/engine/*"]
+      "@engine/*": ["src/engine/*"],
+      "@b-m4th/shared": ["../../packages/shared/src"]
     },
 
     // Best practices

@@ -1,6 +1,7 @@
 import { Button, Group, SegmentedControl, Slider, Stack, Switch, Text } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { SoundManager, type SoundSettings } from "../audio/SoundManager";
+import { clamp } from "@b-m4th/shared";
 
 export type PuzzleThemePreset = "pop" | "candy";
 
@@ -134,8 +135,4 @@ export function ThemeSettings({ settings, onChange }: ThemeSettingsProps) {
       </Stack>
     </section>
   );
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }

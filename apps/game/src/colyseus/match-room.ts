@@ -14,6 +14,7 @@ import {
 } from "@entities";
 import { InviteStore } from "./invite-store";
 import { posKey } from "@engine/pos-key";
+import { minutesToMs } from "@b-m4th/shared";
 import { MatchRegistry } from "./match-registry";
 import {
   CellView,
@@ -279,7 +280,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       ready: this.state.ready,
     });
 
-    const bankMs = this.state.baseMinutes * 60 * 1000;
+    const bankMs = minutesToMs(this.state.baseMinutes);
     const seat: SeatRecord = {
       sessionId: client.sessionId,
       role,
@@ -464,7 +465,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     this.matches?.updateTimeControl(this.matchId, tc);
 
     // Reset pre-start bank previews on all joined seats.
-    const bankMs = tc.baseMinutes * 60 * 1000;
+    const bankMs = minutesToMs(tc.baseMinutes);
     for (const seat of this.seats.values()) {
       seat.bankRemainingMs = bankMs;
       const view = this.playerViewForSession(seat.sessionId);
@@ -523,7 +524,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   private startGame(): void {
     this.state.ready = false;
     this.state.started = true;
-    const bankMs = this.state.baseMinutes * 60 * 1000;
+    const bankMs = minutesToMs(this.state.baseMinutes);
     for (const seat of this.seats.values()) {
       seat.bankRemainingMs = bankMs;
       seat.penaltyScoreTotal = 0;
@@ -582,7 +583,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     const elapsed = Date.now() - this.turnStartedAt;
     view.turnElapsedMs = elapsed;
     // Overage-only penalty preview (not yet applied — applied on settle).
-    const allowed = Math.min(this.state.turnMinutes * 60_000, view.bankRemainingMs);
+    const allowed = Math.min(minutesToMs(this.state.turnMinutes), view.bankRemainingMs);
     const overage = Math.max(0, elapsed - allowed);
     view.overtimePenalty = previewPenalty(overage);
   }
@@ -599,7 +600,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
 
     const elapsed = Date.now() - this.turnStartedAt;
     const bankBefore = view.bankRemainingMs;
-    const turnLimit = this.state.turnMinutes * 60_000;
+    const turnLimit = minutesToMs(this.state.turnMinutes);
     const allowed = Math.min(turnLimit, bankBefore);
 
     view.bankRemainingMs = Math.max(0, bankBefore - elapsed);
