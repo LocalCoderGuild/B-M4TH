@@ -2,14 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { Board } from "@engine/board";
 import { TileBag } from "@engine/tile-bag";
 import { TurnManager } from "@engine/turn-manager";
-import { TILE_CONFIGS } from "@entities";
-import type { Tile, Placement } from "@entities";
-
-function makeTile(face: string, id = face): Tile {
-  const cfg = TILE_CONFIGS.find((t) => t.face === face);
-  if (!cfg) throw new Error(`Unknown tile face: ${face}`);
-  return { id, type: cfg.type, face: cfg.face, value: cfg.value };
-}
+import type { Placement } from "@entities";
+import { makeTile } from "../helpers/make-tile";
 
 function placeAndCollect(
   board: Board,

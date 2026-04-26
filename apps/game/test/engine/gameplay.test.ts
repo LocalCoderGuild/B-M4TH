@@ -1,19 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { Board } from "@engine/board";
 import { TurnManager } from "@engine/turn-manager";
-import { TILE_CONFIGS } from "@entities";
-import type { Tile, Placement } from "@entities";
+import type { Placement } from "@entities";
+import { makeTile } from "../helpers/make-tile";
 
-function makeTile(face: string): Tile {
-  const cfg = TILE_CONFIGS.find((t) => t.face === face);
-  if (!cfg) throw new Error(`Unknown tile face: ${face}`);
-  return {
-    id: `tile-${face}-${Math.random()}`,
-    type: cfg.type,
-    face: cfg.face,
-    value: cfg.value,
-  };
-}
+let tileCounter = 0;
 
 function play(
   board: Board,
@@ -22,7 +13,7 @@ function play(
 ): Placement[] {
   const ps: Placement[] = [];
   for (const { face, row, col } of tiles) {
-    const tile = makeTile(face);
+    const tile = makeTile(face, `gp-${face}-${row}-${col}-${tileCounter++}`);
     board.placeTile({ row, col }, tile);
     ps.push({ tile, position: { row, col } });
   }

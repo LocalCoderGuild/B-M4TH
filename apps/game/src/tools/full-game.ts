@@ -10,6 +10,7 @@ import {
 import { Board } from "@engine/board";
 import { GameEngine } from "@engine/game-engine";
 import { TurnManager } from "@engine/turn-manager";
+import { posKey } from "@engine/pos-key";
 
 const PREMIUM_SYMBOL: Record<BoardCell["premium"], string> = {
   normal: ".",
@@ -132,7 +133,7 @@ function isCellEmpty(board: BoardCell[][], pos: Position): boolean {
 }
 
 function hasAdjacentExistingTile(board: BoardCell[][], positions: Position[]): boolean {
-  const occupiedByMove = new Set(positions.map((p) => `${p.row}:${p.col}`));
+  const occupiedByMove = new Set(positions.map((p) => posKey(p.row, p.col)));
   for (const pos of positions) {
     const neighbors: Position[] = [
       { row: pos.row - 1, col: pos.col },
@@ -144,7 +145,7 @@ function hasAdjacentExistingTile(board: BoardCell[][], positions: Position[]): b
       if (n.row < 0 || n.row >= GAME_CONFIG.BOARD_SIZE || n.col < 0 || n.col >= GAME_CONFIG.BOARD_SIZE) {
         continue;
       }
-      const key = `${n.row}:${n.col}`;
+      const key = posKey(n.row, n.col);
       if (occupiedByMove.has(key)) continue;
       if (board[n.row]?.[n.col]?.tile !== null) {
         return true;

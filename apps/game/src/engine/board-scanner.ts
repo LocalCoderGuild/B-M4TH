@@ -1,6 +1,7 @@
 import type { Position, Placement, Direction } from "@entities";
 import { getEffectiveFace } from "@entities";
 import { Board } from "./board";
+import { posKey } from "./pos-key";
 
 export interface ScannedEquation {
   faces: string[];
@@ -40,7 +41,7 @@ function getLine(
 }
 
 function lineKey(eq: ScannedEquation): string {
-  return eq.positions.map((p) => `${p.row},${p.col}`).join("|");
+  return eq.positions.map((p) => posKey(p.row, p.col)).join("|");
 }
 
 export class BoardScanner {

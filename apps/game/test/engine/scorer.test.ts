@@ -2,14 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { Board } from "@engine/board";
 import { BoardScanner } from "@engine/board-scanner";
 import { Scorer } from "@engine/scorer";
-import { PREMIUM_SQUARES, TILE_CONFIGS } from "@entities";
-import type { Placement, PremiumType, Tile } from "@entities";
-
-function makeTile(face: string, id: string): Tile {
-  const cfg = TILE_CONFIGS.find((t) => t.face === face);
-  if (!cfg) throw new Error(`Unknown tile face: ${face}`);
-  return { id, type: cfg.type, face: cfg.face, value: cfg.value };
-}
+import { PREMIUM_SQUARES } from "@entities";
+import type { Placement, PremiumType } from "@entities";
+import { makeTile } from "../helpers/make-tile";
 
 function placeExisting(
   board: Board,

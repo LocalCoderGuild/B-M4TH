@@ -1,14 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { TileBag, assignTile, getTileConfigs, getTotalTileCount } from "@engine/tile-bag";
-import { getEffectiveFace, TILE_CONFIGS } from "@entities";
+import { getEffectiveFace } from "@entities";
 import type { Tile } from "@entities";
+import { makeTile } from "../helpers/make-tile";
 import seedrandom from "seedrandom";
-
-function tileFromConfig(face: string, id: string): Tile {
-  const cfg = TILE_CONFIGS.find((t) => t.face === face);
-  if (!cfg) throw new Error(`Unknown tile face: ${face}`);
-  return { id, type: cfg.type, face: cfg.face, value: cfg.value };
-}
 
 describe("seedrandom - determinism", () => {
   test("same seed produces same sequence", () => {
@@ -203,9 +198,9 @@ describe("TileBag - draw (stack behavior)", () => {
 
   test("draw removes from top of stack", () => {
     const bag = TileBag.fromTiles([
-      tileFromConfig("1", "a"),
-      tileFromConfig("2", "b"),
-      tileFromConfig("3", "c"),
+      makeTile("1", "a"),
+      makeTile("2", "b"),
+      makeTile("3", "c"),
     ]);
     const drawn = bag.draw(2);
     expect(drawn.map((t) => t.id)).toEqual(["b", "c"]);
@@ -224,7 +219,7 @@ describe("TileBag - swap", () => {
     const makeBag = (n: number) =>
       TileBag.fromTiles(
         Array.from({ length: n }, (_, i) => ({
-          ...tileFromConfig("1", `t_${i}`),
+          ...makeTile("1", `t_${i}`),
         })),
       );
 
@@ -235,7 +230,7 @@ describe("TileBag - swap", () => {
   test("canSwap returns true when bag has exactly SWAP_BAG_MINIMUM + 1 tiles", () => {
     const bag = TileBag.fromTiles(
       Array.from({ length: 6 }, (_, i) => ({
-        ...tileFromConfig("1", `t_${i}`),
+        ...makeTile("1", `t_${i}`),
       })),
     );
     expect(bag.canSwap()).toBe(true);
@@ -312,7 +307,7 @@ describe("TileBag - encapsulation", () => {
 
   test("drawn tiles are independent copies from peekAll", () => {
     const bag = TileBag.fromTiles([
-      tileFromConfig("1", "a"),
+      makeTile("1", "a"),
     ]);
     const peeked = bag.peekAll();
     const drawn = bag.draw(1);
@@ -322,96 +317,92 @@ describe("TileBag - encapsulation", () => {
 });
 
 describe("assignTile", () => {
-  function makeTile(face: string): Tile {
-    return tileFromConfig(face, "test");
-  }
-
   test("+/- assigned to '+'", () => {
-    const tile = makeTile("+/-");
+    const tile = makeTile("+/-", "test");
     const assigned = assignTile(tile, "+");
     expect(assigned.assignedFace).toBe("+");
     expect(getEffectiveFace(assigned)).toBe("+");
   });
 
   test("+/- assigned to '-'", () => {
-    const tile = makeTile("+/-");
+    const tile = makeTile("+/-", "test");
     const assigned = assignTile(tile, "-");
     expect(assigned.assignedFace).toBe("-");
     expect(getEffectiveFace(assigned)).toBe("-");
   });
 
   test("+/- rejects invalid assignment", () => {
-    const tile = makeTile("+/-");
+    const tile = makeTile("+/-", "test");
     expect(() => assignTile(tile, "×")).toThrow();
     expect(() => assignTile(tile, "5")).toThrow();
   });
 
   test("×/÷ assigned to '×'", () => {
-    const tile = makeTile("×/÷");
+    const tile = makeTile("×/÷", "test");
     const assigned = assignTile(tile, "×");
     expect(assigned.assignedFace).toBe("×");
     expect(getEffectiveFace(assigned)).toBe("×");
   });
 
   test("×/÷ assigned to '÷'", () => {
-    const tile = makeTile("×/÷");
+    const tile = makeTile("×/÷", "test");
     const assigned = assignTile(tile, "÷");
     expect(assigned.assignedFace).toBe("÷");
     expect(getEffectiveFace(assigned)).toBe("÷");
   });
 
   test("×/÷ rejects invalid assignment", () => {
-    const tile = makeTile("×/÷");
+    const tile = makeTile("×/÷", "test");
     expect(() => assignTile(tile, "+")).toThrow();
   });
 
   test("BLANK assigned to a number", () => {
-    const tile = makeTile("BLANK");
+    const tile = makeTile("BLANK", "test");
     const assigned = assignTile(tile, "7");
     expect(assigned.assignedFace).toBe("7");
     expect(getEffectiveFace(assigned)).toBe("7");
   });
 
   test("BLANK assigned to a multi-digit number", () => {
-    const tile = makeTile("BLANK");
+    const tile = makeTile("BLANK", "test");
     const assigned = assignTile(tile, "20");
     expect(assigned.assignedFace).toBe("20");
     expect(getEffectiveFace(assigned)).toBe("20");
   });
 
   test("BLANK assigned to an operator", () => {
-    const tile = makeTile("BLANK");
+    const tile = makeTile("BLANK", "test");
     const assigned = assignTile(tile, "+");
     expect(assigned.assignedFace).toBe("+");
     expect(getEffectiveFace(assigned)).toBe("+");
   });
 
   test("BLANK assigned to equals", () => {
-    const tile = makeTile("BLANK");
+    const tile = makeTile("BLANK", "test");
     const assigned = assignTile(tile, "=");
     expect(assigned.assignedFace).toBe("=");
     expect(getEffectiveFace(assigned)).toBe("=");
   });
 
   test("BLANK rejects invalid assignment", () => {
-    const tile = makeTile("BLANK");
+    const tile = makeTile("BLANK", "test");
     expect(() => assignTile(tile, "+/-" as any)).toThrow();
     expect(() => assignTile(tile, "21" as any)).toThrow();
     expect(() => assignTile(tile, "BLANK" as any)).toThrow();
   });
 
   test("regular number tile cannot be assigned", () => {
-    const tile = makeTile("5");
+    const tile = makeTile("5", "test");
     expect(() => assignTile(tile, "6" as any)).toThrow();
   });
 
   test("regular operator tile cannot be assigned", () => {
-    const tile = makeTile("+");
+    const tile = makeTile("+", "test");
     expect(() => assignTile(tile, "-" as any)).toThrow();
   });
 
   test("assignment does not mutate original tile", () => {
-    const tile = makeTile("+/-");
+    const tile = makeTile("+/-", "test");
     const assigned = assignTile(tile, "+");
     expect(tile.assignedFace).toBeUndefined();
     expect(assigned.assignedFace).toBe("+");

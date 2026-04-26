@@ -2,14 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { GameEngine } from "@engine/game-engine";
 import { Board } from "@engine/board";
 import { TileBag } from "@engine/tile-bag";
-import { TILE_CONFIGS } from "@entities";
-import type { Tile, Player } from "@entities";
-
-function tile(face: string, id: string): Tile {
-  const cfg = TILE_CONFIGS.find((t) => t.face === face);
-  if (!cfg) throw new Error(`Unknown face: ${face}`);
-  return { id, type: cfg.type, face: cfg.face, value: cfg.value };
-}
+import type { Player } from "@entities";
+import { makeTile } from "../helpers/make-tile";
 
 describe("GameEngine.create", () => {
   test("initializes board, racks, and starting player", () => {
@@ -29,13 +23,13 @@ describe("GameEngine.create", () => {
 describe("GameEngine full game ending - Trigger A (bag empty + empty rack)", () => {
   test("finishes game and applies opponent-rack x2 final adjustment", () => {
     const p1Rack = [
-      tile("1", "p1-1"),
-      tile("+", "p1-plus"),
-      tile("1", "p1-2"),
-      tile("=", "p1-eq"),
-      tile("2", "p1-3"),
+      makeTile("1", "p1-1"),
+      makeTile("+", "p1-plus"),
+      makeTile("1", "p1-2"),
+      makeTile("=", "p1-eq"),
+      makeTile("2", "p1-3"),
     ];
-    const p2Rack = [tile("10", "p2-10"), tile("5", "p2-5")];
+    const p2Rack = [makeTile("10", "p2-10"), makeTile("5", "p2-5")];
     const players: Player[] = [
       { id: "p1", rack: p1Rack, score: 0 },
       { id: "p2", rack: p2Rack, score: 0 },

@@ -1,13 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { Board } from "@engine/board";
-import { TILE_CONFIGS } from "@entities";
-import type { Tile } from "@entities";
-
-function makeTile(face: string, id = face): Tile {
-  const cfg = TILE_CONFIGS.find((t) => t.face === face);
-  if (!cfg) throw new Error(`Unknown tile face: ${face}`);
-  return { id, type: cfg.type, face: cfg.face, value: cfg.value };
-}
+import { makeTile } from "../helpers/make-tile";
 
 describe("Board - initialisation", () => {
   test("creates a 15x15 grid", () => {

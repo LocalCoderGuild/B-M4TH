@@ -1,5 +1,6 @@
 import type { Position, Placement } from "@entities";
 import { Board } from "./board";
+import { posKey } from "./pos-key";
 
 const ORTHO_DIRS = [
   [-1, 0],
@@ -47,7 +48,7 @@ export class MoveValidator {
     }
 
     const placedKeys = new Set(
-      placements.map((p) => `${p.position.row},${p.position.col}`),
+      placements.map((p) => posKey(p.position.row, p.position.col)),
     );
 
     return placements.some((p) =>
@@ -57,7 +58,7 @@ export class MoveValidator {
           col: p.position.col + dc,
         };
         return (
-          !placedKeys.has(`${neighbor.row},${neighbor.col}`) &&
+          !placedKeys.has(posKey(neighbor.row, neighbor.col)) &&
           board.isInBounds(neighbor) &&
           board.isOccupied(neighbor)
         );

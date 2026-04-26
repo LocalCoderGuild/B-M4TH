@@ -1,14 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { Board } from "@engine/board";
 import { BoardScanner } from "@engine/board-scanner";
-import { TILE_CONFIGS } from "@entities";
-import type { Tile, Placement } from "@entities";
-
-function makeTile(face: string, id = face): Tile {
-  const cfg = TILE_CONFIGS.find((t) => t.face === face);
-  if (!cfg) throw new Error(`Unknown tile face: ${face}`);
-  return { id, type: cfg.type, face: cfg.face, value: cfg.value };
-}
+import type { Placement } from "@entities";
+import { makeTile } from "../helpers/make-tile";
 
 function place(board: Board, tiles: Array<{ face: string; row: number; col: number }>) {
   for (const { face, row, col } of tiles) {

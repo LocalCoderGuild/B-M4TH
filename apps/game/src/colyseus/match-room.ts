@@ -13,6 +13,7 @@ import {
   VALID_BLANK_ASSIGNMENTS,
 } from "@entities";
 import { InviteStore } from "./invite-store";
+import { posKey } from "@engine/pos-key";
 import { MatchRegistry } from "./match-registry";
 import {
   CellView,
@@ -648,7 +649,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     // Guard against duplicate positions up-front (engine also guards, but surface cleaner error).
     const seenPositions = new Set<string>();
     for (const m of moves) {
-      const key = `${m.position.row},${m.position.col}`;
+      const key = posKey(m.position.row, m.position.col);
       if (seenPositions.has(key)) {
         this.sendError(client, "duplicate_position", `Duplicate position: ${key}`);
         return;

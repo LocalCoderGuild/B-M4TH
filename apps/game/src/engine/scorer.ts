@@ -2,6 +2,7 @@ import type { Placement, PremiumType, Position } from "@entities";
 import { GAME_CONFIG } from "@entities";
 import type { ScannedEquation } from "./board-scanner";
 import { Board } from "./board";
+import { posKey } from "./pos-key";
 
 export interface TileScoreDetail {
   position: Position;
@@ -27,10 +28,6 @@ export interface TurnScoreBreakdown {
   equationScores: number[];
   bingoBonus: number;
   equations: EquationScoreDetail[];
-}
-
-function posKey(row: number, col: number): string {
-  return `${row},${col}`;
 }
 
 export class Scorer {
