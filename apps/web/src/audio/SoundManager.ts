@@ -27,7 +27,8 @@ class SoundManagerImpl {
         const parsed = JSON.parse(raw) as Partial<SoundSettings>;
         this.enabled = parsed.enabled ?? this.enabled;
         this.volume = clamp(parsed.volume ?? this.volume, 0, 1);
-      } catch {
+      } catch (err) {
+        console.warn("Sound settings parse failed:", err);
         localStorage.removeItem(STORAGE_KEY);
       }
     }

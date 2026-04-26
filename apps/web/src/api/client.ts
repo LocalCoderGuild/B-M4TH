@@ -17,7 +17,7 @@ async function json<T>(res: Response): Promise<T> {
       const body = await res.json();
       detail = body?.error ?? body?.message ?? JSON.stringify(body);
     } catch {
-      detail = await res.text();
+      detail = await res.text().catch(() => `Request failed (${res.status})`);
     }
     throw new Error(detail || `Request failed (${res.status})`);
   }

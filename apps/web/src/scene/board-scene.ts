@@ -82,8 +82,8 @@ export class BoardScene {
     if (typeof document !== "undefined" && document.fonts?.ready) {
       try {
         await document.fonts.ready;
-      } catch {
-        /* non-fatal */
+      } catch (err) {
+        console.warn("Font loading failed:", err);
       }
     }
     await this.app.init({
@@ -125,8 +125,8 @@ export class BoardScene {
     this.resizeObserver = null;
     try {
       this.app.destroy(true, { children: true });
-    } catch {
-      /* best-effort */
+    } catch (err) {
+      console.warn("Pixi teardown failed:", err);
     }
   }
 

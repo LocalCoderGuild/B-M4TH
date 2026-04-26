@@ -1,15 +1,9 @@
+export type { TileDto, PlayerDto, LastMoveDto, MatchStateDto, BoardCellDto } from "@b-m4th/shared";
+
 export type Role = "host" | "player";
 /** @deprecated kept for lingering references — use Role. */
 export type Slot = Role;
 export type Phase = "waiting" | "playing" | "finished";
-
-export interface TileDto {
-  id: string;
-  face: string;
-  type: "number" | "operator" | "blank" | string;
-  value: number;
-  assignedFace: string | null;
-}
 
 export interface RackMessage {
   tiles: TileDto[];

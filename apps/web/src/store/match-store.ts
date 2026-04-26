@@ -1,5 +1,11 @@
 import { create } from "zustand";
 import type { ErrorMessage, PendingPlacement, Phase, TileDto } from "../types";
+import type {
+  BoardCellDto,
+  PlayerDto,
+  LastMoveDto,
+  MatchStateDto,
+} from "@b-m4th/shared";
 
 export interface TurnLogEntry {
   id: number;
@@ -11,64 +17,10 @@ export interface TurnLogEntry {
   scoreDelta: number;
 }
 
-export interface BoardCellView {
-  index: number;
-  row: number;
-  col: number;
-  premium: string;
-  tile: {
-    id: string;
-    face: string;
-    assignedFace: string;
-    value: number;
-    tileType: string;
-  } | null;
-}
-
-export interface PlayerSnapshot {
-  sessionId: string;
-  name: string;
-  slot: "host" | "player";
-  seatIndex: number;
-  score: number;
-  rackCount: number;
-  connected: boolean;
-  bankRemainingMs: number;
-  turnElapsedMs: number;
-  overtimePenalty: number;
-  color: string;
-}
-
-export interface LastMoveSnapshot {
-  sessionId: string;
-  action: string;
-  scoreDelta: number;
-  turnNumber: number;
-  placedIndices: number[];
-}
-
-export interface MatchSnapshot {
-  matchId: string;
-  phase: Phase;
-  ready: boolean;
-  turnNumber: number;
-  currentSessionId: string;
-  isFirstMove: boolean;
-  consecutivePasses: number;
-  bagRemaining: number;
-  boardSize: number;
-  board: BoardCellView[];
-  players: PlayerSnapshot[];
-  lastMove?: LastMoveSnapshot;
-  winnerSessionId: string;
-  baseMinutes: number;
-  incrementSeconds: number;
-  turnMinutes: number;
-  started: boolean;
-  hostSessionId: string;
-  maxPlayers: number;
-  minPlayers: number;
-}
+export type { BoardCellDto as BoardCellView } from "@b-m4th/shared";
+export type { PlayerDto as PlayerSnapshot } from "@b-m4th/shared";
+export type { LastMoveDto as LastMoveSnapshot } from "@b-m4th/shared";
+export type { MatchStateDto as MatchSnapshot } from "@b-m4th/shared";
 
 export interface DragState {
   tileId: string | null;

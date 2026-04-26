@@ -321,7 +321,8 @@ function scoreMove(
       : { ...tile };
     try {
       board.placeTile(move.position, placedTile);
-    } catch {
+    } catch (err) {
+      console.warn(`placeTile failed at (${move.position.row},${move.position.col}):`, err);
       return null;
     }
     placements.push({ tile: placedTile, position: move.position });

@@ -35,7 +35,8 @@ export function loadPuzzleThemeSettings(): PuzzleThemeSettings {
       intensity: clamp(parsed.intensity ?? defaults.intensity, 0, 1),
       preset: parsed.preset === "candy" ? "candy" : "pop",
     };
-  } catch {
+  } catch (err) {
+    console.warn("Theme settings parse failed:", err);
     localStorage.removeItem(STORAGE_KEY);
     return defaults;
   }

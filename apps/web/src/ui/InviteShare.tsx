@@ -8,8 +8,8 @@ export function InviteShare({ label, link }: { label: string; link: string }) {
       await navigator.clipboard.writeText(link);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // clipboard API unavailable; fall back to selection
+    } catch (err) {
+      console.warn("Clipboard write failed:", err);
     }
   };
 

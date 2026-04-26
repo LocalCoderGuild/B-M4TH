@@ -309,7 +309,10 @@ export async function tryReconnect(): Promise<Room | null> {
     activeRoom = room;
     wireRoom(room);
     return room;
-  } catch {
+  } catch (err) {
+    clientLog("join.reconnect.failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     localStorage.removeItem(RECONNECT_KEY);
     return null;
   }
@@ -320,8 +323,10 @@ export function leaveRoom(): void {
   if (activeRoom) {
     try {
       activeRoom.leave(true);
-    } catch {
-      /* ignore */
+    } catch (err) {
+      clientLog("room.leave.failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     activeRoom = null;
   }
