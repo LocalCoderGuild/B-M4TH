@@ -629,11 +629,18 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     }
   }
 
-  private handlePlay(client: Client, rawPayload: unknown): void {
+  private withActionGuard<T>(
+    client: Client,
+    schema: z.ZodType<T>,
+    rawPayload: unknown,
+    invalidCode: string,
+    invalidMsg: string,
+    fn: (data: T, engine: GameEngine) => void,
+  ): void {
     if (!this.ensureActionAllowed(client)) return;
-    const parsed = playMessageSchema.safeParse(rawPayload);
-    if (!parsed.success) {
-      this.sendError(client, "invalid_play", parsed.error.issues[0]?.message ?? "Invalid play");
+    const result = schema.safeParse(rawPayload);
+    if (!result.success) {
+      this.sendError(client, invalidCode, result.error.issues[0]?.message ?? invalidMsg);
       return;
     }
     if (!this.engine) {
@@ -644,68 +651,49 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       this.sendError(client, "not_your_turn", "It is not your turn");
       return;
     }
+    fn(result.data, this.engine);
+  }
 
-    const moves: Array<{ tileId: string; position: Position; assignedFace?: BlankAssignment }> =
-      parsed.data.moves.map((m) => ({
-        tileId: m.tileId,
-        position: m.position,
-        assignedFace: m.assignedFace,
-      }));
+  private handlePlay(client: Client, rawPayload: unknown): void {
+    this.withActionGuard(client, playMessageSchema, rawPayload, "invalid_play", "Invalid play", (data, engine) => {
+      const moves: Array<{ tileId: string; position: Position; assignedFace?: BlankAssignment }> =
+        data.moves.map((m) => ({
+          tileId: m.tileId,
+          position: m.position,
+          assignedFace: m.assignedFace,
+        }));
 
-    // Guard against duplicate positions up-front (engine also guards, but surface cleaner error).
-    const seenPositions = new Set<string>();
-    for (const m of moves) {
-      const key = posKey(m.position.row, m.position.col);
-      if (seenPositions.has(key)) {
-        this.sendError(client, "duplicate_position", `Duplicate position: ${key}`);
-        return;
+      // Guard against duplicate positions up-front (engine also guards, but surface cleaner error).
+      const seenPositions = new Set<string>();
+      for (const m of moves) {
+        const key = posKey(m.position.row, m.position.col);
+        if (seenPositions.has(key)) {
+          this.sendError(client, "duplicate_position", `Duplicate position: ${key}`);
+          return;
+        }
+        seenPositions.add(key);
       }
-      seenPositions.add(key);
-    }
 
-    const result = this.engine.play(moves);
-    this.afterAction(result, client, {
-      action: "play",
-      placedPositions: result.ok ? moves.map((m) => m.position) : [],
+      const result = engine.play(moves);
+      this.afterAction(result, client, {
+        action: "play",
+        placedPositions: result.ok ? moves.map((m) => m.position) : [],
+      });
     });
   }
 
   private handleSwap(client: Client, rawPayload: unknown): void {
-    if (!this.ensureActionAllowed(client)) return;
-    const parsed = swapMessageSchema.safeParse(rawPayload);
-    if (!parsed.success) {
-      this.sendError(client, "invalid_swap", parsed.error.issues[0]?.message ?? "Invalid swap");
-      return;
-    }
-    if (!this.engine) {
-      this.sendError(client, "not_ready", "Game has not started yet");
-      return;
-    }
-    if (this.engine.getState().currentPlayerId !== client.sessionId) {
-      this.sendError(client, "not_your_turn", "It is not your turn");
-      return;
-    }
-    const result = this.engine.swap(parsed.data.tileIds);
-    this.afterAction(result, client, { action: "swap", placedPositions: [] });
+    this.withActionGuard(client, swapMessageSchema, rawPayload, "invalid_swap", "Invalid swap", (data, engine) => {
+      const result = engine.swap(data.tileIds);
+      this.afterAction(result, client, { action: "swap", placedPositions: [] });
+    });
   }
 
   private handlePass(client: Client, rawPayload: unknown): void {
-    if (!this.ensureActionAllowed(client)) return;
-    const parsed = passMessageSchema.safeParse(rawPayload ?? {});
-    if (!parsed.success) {
-      this.sendError(client, "invalid_pass", "Invalid pass");
-      return;
-    }
-    if (!this.engine) {
-      this.sendError(client, "not_ready", "Game has not started yet");
-      return;
-    }
-    if (this.engine.getState().currentPlayerId !== client.sessionId) {
-      this.sendError(client, "not_your_turn", "It is not your turn");
-      return;
-    }
-    const result = this.engine.pass();
-    this.afterAction(result, client, { action: "pass", placedPositions: [] });
+    this.withActionGuard(client, passMessageSchema, rawPayload ?? {}, "invalid_pass", "Invalid pass", (_data, engine) => {
+      const result = engine.pass();
+      this.afterAction(result, client, { action: "pass", placedPositions: [] });
+    });
   }
 
   /** Replay private rack state for reconnect/reload recovery without allowing hot-loop spam. */
