@@ -68,7 +68,11 @@ export function HomePage() {
           </label>
           <div className="pixel-field">
             <span>Players</span>
-            <div className="pixel-chip-row" role="radiogroup" aria-label="Max players">
+            <div
+              className="pixel-chip-row"
+              role="radiogroup"
+              aria-label="Max players"
+            >
               {PLAYER_COUNT_OPTIONS.map((n) => (
                 <button
                   key={n}

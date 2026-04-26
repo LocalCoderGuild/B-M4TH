@@ -109,9 +109,10 @@ export async function bootstrap(opts: BootstrapOptions = {}): Promise<{
 }
 
 if (import.meta.main) {
+  console.debug(env);
   bootstrap({
-    publicBaseUrl: process.env.PUBLIC_BASE_URL,
-    clientOrigin: process.env.CLIENT_ORIGIN,
+    publicBaseUrl: env.PUBLIC_BASE_URL,
+    clientOrigin: env.CLIENT_ORIGIN,
   })
     .then(({ engineServer, apiServer }) => {
       console.log(`B-M4TH service instance`);
