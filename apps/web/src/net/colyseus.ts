@@ -1,4 +1,5 @@
 import { Client, type Room } from "@colyseus/sdk";
+import { createLogger } from "@b-m4th/shared";
 import { SERVER_ORIGIN } from "../api/client";
 import {
   useMatchStore,
@@ -107,9 +108,7 @@ function snapshotFromState(state: any): MatchSnapshot {
   };
 }
 
-function clientLog(event: string, details: Record<string, unknown>): void {
-  console.info("colyseus.client", { event, ...details });
-}
+const clientLog = createLogger("colyseus.client");
 
 /** Reset rack-recovery throttling when the active room lifecycle changes. */
 function resetRackRecovery(room: Room | null): void {

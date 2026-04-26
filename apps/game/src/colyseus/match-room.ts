@@ -13,7 +13,7 @@ import {
 } from "@entities";
 import { InviteStore } from "./invite-store";
 import { posKey } from "@engine/pos-key";
-import { minutesToMs, PLAYER_COLOR_KEYS, defaultColorForSeat } from "@b-m4th/shared";
+import { minutesToMs, PLAYER_COLOR_KEYS, defaultColorForSeat, createLogger } from "@b-m4th/shared";
 import type { PlayerColorKey } from "@b-m4th/shared";
 import { MatchRegistry } from "./match-registry";
 import { timeControlSchema } from "./schemas/time-control-schema";
@@ -60,9 +60,7 @@ const RECONNECTION_GRACE_SECONDS = 300; // 5 minutes
 const RATE_LIMIT_WINDOW_MS = 500;
 const RACK_RECOVERY_WINDOW_MS = 1000;
 
-function roomLog(event: string, details: Record<string, unknown>): void {
-  console.info("colyseus.MatchRoom", { event, ...details });
-}
+const roomLog = createLogger("colyseus.MatchRoom");
 
 const positionSchema = z.object({
   row: z.number().int().min(0).max(GAME_CONFIG.BOARD_SIZE - 1),

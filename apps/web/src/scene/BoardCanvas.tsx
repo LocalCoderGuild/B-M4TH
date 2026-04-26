@@ -5,6 +5,9 @@ import { getPlayerPaletteByKey, isHexColor } from "../ui/player-colors";
 import { BoardScene } from "./board-scene";
 import { needsAssignment } from "../ui/tile-assignment";
 import { BOARD_SIZE, EVENTS } from "../constants";
+import { createLogger } from "@b-m4th/shared";
+
+const boardLog = createLogger("pixi.BoardCanvas");
 
 export function BoardCanvas() {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -77,8 +80,7 @@ export function BoardCanvas() {
       if (cancelled) scene.destroy();
       const snapshot = useMatchStore.getState().snapshot;
       if (!cancelled && snapshot && isBoardReady(snapshot)) {
-        console.info("pixi.BoardCanvas", {
-          event: "initialRender",
+        boardLog("initialRender", {
           phase: snapshot.phase,
           ready: snapshot.ready,
           boardLength: snapshot.board.length,
@@ -104,8 +106,7 @@ export function BoardCanvas() {
         nextReady &&
         (prevTurn !== nextTurn || !prev.snapshot || !prevReady)
       ) {
-        console.info("pixi.BoardCanvas", {
-          event: "renderBoard",
+        boardLog("renderBoard", {
           phase: state.snapshot.phase,
           ready: state.snapshot.ready,
           boardLength: state.snapshot.board.length,

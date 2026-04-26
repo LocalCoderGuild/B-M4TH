@@ -1,4 +1,7 @@
 import { env } from "../env";
+import { createLogger } from "@b-m4th/shared";
+
+const clientLog = createLogger("colyseus.client");
 import type {
   ClaimResponse,
   CreateMatchResponse,
@@ -28,7 +31,7 @@ export async function createMatch(
   hostName: string,
   opts: { maxPlayers?: number } = {},
 ): Promise<CreateMatchResponse> {
-  console.info("colyseus.client", { event: "match.create.request" });
+  clientLog("match.create.request");
   const body: Record<string, unknown> = { hostName };
   if (opts.maxPlayers !== undefined) body.maxPlayers = opts.maxPlayers;
   const res = await fetch(`${SERVER_ORIGIN}/api/matches`, {
@@ -50,7 +53,7 @@ export async function claimInvite(
   token: string,
   name: string,
 ): Promise<ClaimResponse> {
-  console.info("colyseus.client", { event: "invite.claim.request" });
+  clientLog("invite.claim.request");
   const res = await fetch(
     `${SERVER_ORIGIN}/api/invites/${encodeURIComponent(token)}/claim`,
     {

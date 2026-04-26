@@ -12,3 +12,4 @@ export type {
 } from "./dto";
 export { PLAYER_COLOR_KEYS, defaultColorForSeat } from "./colors";
 export type { PlayerColorKey } from "./colors";
+export { createLogger } from "./logger";
