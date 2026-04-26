@@ -70,7 +70,6 @@ function buildLink(baseUrl: string, token: string): string {
 }
 
 export function createElysiaApp(deps: HttpDeps) {
-  console.debug("origin", deps.clientOrigin.split(","));
   const app = new Elysia({ websocket: {} })
     .use(
       cors({

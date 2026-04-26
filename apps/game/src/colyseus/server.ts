@@ -4,7 +4,6 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { BunWebSockets } from "@colyseus/bun-websockets";
 import {
   createElysiaApp,
-  createHttpApp,
   type MatchProvisioner,
   type SeatReservation,
 } from "../http";
