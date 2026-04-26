@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "dev:game": "cd apps/game && bun dev:server",
+    "dev:web": "cd apps/web && bun dev",
+    "dev": "bun run dev:game & bun run dev:web"
+  }
+}

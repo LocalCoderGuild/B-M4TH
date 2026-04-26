@@ -9,17 +9,22 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Client as ColyseusClient } from "@colyseus/sdk";
 import { bootstrap } from "../../src/colyseus/server";
 
+const TEST_ENGINE_PORT = 17566;
+const TEST_API_PORT = 17567;
+
 let server: Awaited<ReturnType<typeof bootstrap>>;
 let httpBase: string;
 let wsBase: string;
 
 beforeAll(async () => {
   server = await bootstrap({
-    port: 0,
-    publicBaseUrl: "http://127.0.0.1:0",
+    enginePort: TEST_ENGINE_PORT,
+    apiPort: TEST_API_PORT,
+    clientOrigin: "*",
+    publicBaseUrl: `http://127.0.0.1:${TEST_API_PORT}`,
   });
-  httpBase = `http://127.0.0.1:${server.port}`;
-  wsBase = `ws://127.0.0.1:${server.port}`;
+  httpBase = `http://127.0.0.1:${server.apiServer.port}`;
+  wsBase = `ws://127.0.0.1:${server.engineServer.port}`;
 });
 
 afterAll(async () => {

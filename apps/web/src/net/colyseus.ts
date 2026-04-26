@@ -1,7 +1,19 @@
 import { Client, type Room } from "@colyseus/sdk";
 import { SERVER_ORIGIN } from "../api/client";
-import { useMatchStore, type MatchSnapshot, type BoardCellView, type PlayerSnapshot } from "../store/match-store";
-import type { ClaimResponse, ErrorMessage, PendingPlacement, RackMessage, TileDto } from "../types";
+import {
+  useMatchStore,
+  type MatchSnapshot,
+  type BoardCellView,
+  type PlayerSnapshot,
+} from "../store/match-store";
+import type {
+  ClaimResponse,
+  ErrorMessage,
+  PendingPlacement,
+  RackMessage,
+  TileDto,
+} from "../types";
+import { env } from "../env";
 
 const RECONNECT_KEY = "b-m4th:reconnection"; // localStorage — survives tab close, cleared on leave
 const RACK_RECOVERY_COOLDOWN_MS = 1000;
@@ -20,7 +32,7 @@ let rackRecoveryNextAllowedAt = 0;
 /** Reuse a single Colyseus client for the current browser tab. */
 function getClient(): Client {
   if (!client) {
-    const wsUrl = SERVER_ORIGIN.replace(/^http/, "ws");
+    const wsUrl = env.VITE_ENGINE_URL ?? SERVER_ORIGIN.replace(/^http/, "ws");
     client = new Client(wsUrl);
   }
   return client;
@@ -48,21 +60,21 @@ function snapshotFromState(state: any): MatchSnapshot {
         : null,
     });
   }
-  const players: PlayerSnapshot[] = (state.players ? Array.from(state.players) : []).map(
-    (p: any) => ({
-      sessionId: p.sessionId,
-      name: p.name,
-      slot: p.slot,
-      seatIndex: p.seatIndex ?? 0,
-      score: p.score,
-      rackCount: p.rackCount,
-      connected: p.connected,
-      bankRemainingMs: p.bankRemainingMs,
-      turnElapsedMs: p.turnElapsedMs ?? 0,
-      overtimePenalty: p.overtimePenalty,
-      color: p.color ?? "",
-    }),
-  );
+  const players: PlayerSnapshot[] = (
+    state.players ? Array.from(state.players) : []
+  ).map((p: any) => ({
+    sessionId: p.sessionId,
+    name: p.name,
+    slot: p.slot,
+    seatIndex: p.seatIndex ?? 0,
+    score: p.score,
+    rackCount: p.rackCount,
+    connected: p.connected,
+    bankRemainingMs: p.bankRemainingMs,
+    turnElapsedMs: p.turnElapsedMs ?? 0,
+    overtimePenalty: p.overtimePenalty,
+    color: p.color ?? "",
+  }));
   return {
     matchId: state.matchId,
     phase: state.phase,
@@ -129,10 +141,15 @@ function wireRoom(room: Room): void {
     });
 
     // Detect new completed turn → append to log and clear transient state.
-    if (snapshot.lastMove && lastSeenMoveTurnNumber !== snapshot.lastMove.turnNumber) {
+    if (
+      snapshot.lastMove &&
+      lastSeenMoveTurnNumber !== snapshot.lastMove.turnNumber
+    ) {
       lastSeenMoveTurnNumber = snapshot.lastMove.turnNumber;
       if (snapshot.lastMove.action !== "start") {
-        const actor = snapshot.players.find((p) => p.sessionId === snapshot.lastMove?.sessionId);
+        const actor = snapshot.players.find(
+          (p) => p.sessionId === snapshot.lastMove?.sessionId,
+        );
         if (actor) {
           useMatchStore.getState().appendTurnLog({
             turnNumber: snapshot.lastMove.turnNumber,
@@ -171,18 +188,28 @@ function wireRoom(room: Room): void {
     useMatchStore.getState().setError(payload);
   });
 
-  room.onMessage("opponentPending", (payload: { sessionId: string; placements: PendingPlacement[] }) => {
-    clientLog("room.message.opponentPending", {
-      roomId: room.roomId,
-      sessionId: room.sessionId,
-      count: payload.placements.length,
-    });
-    useMatchStore.getState().setOpponentPending(payload.placements);
-  });
+  room.onMessage(
+    "opponentPending",
+    (payload: { sessionId: string; placements: PendingPlacement[] }) => {
+      clientLog("room.message.opponentPending", {
+        roomId: room.roomId,
+        sessionId: room.sessionId,
+        count: payload.placements.length,
+      });
+      useMatchStore.getState().setOpponentPending(payload.placements);
+    },
+  );
 
-  room.onMessage("previewScore", (payload: { valid: boolean; score?: number }) => {
-    useMatchStore.getState().setPreviewScore(payload.valid && payload.score !== undefined ? payload.score : null);
-  });
+  room.onMessage(
+    "previewScore",
+    (payload: { valid: boolean; score?: number }) => {
+      useMatchStore
+        .getState()
+        .setPreviewScore(
+          payload.valid && payload.score !== undefined ? payload.score : null,
+        );
+    },
+  );
 
   room.onLeave(() => {
     clientLog("room.leave", { roomId: room.roomId, sessionId: room.sessionId });
@@ -190,8 +217,15 @@ function wireRoom(room: Room): void {
   });
 
   room.onError((code, message) => {
-    clientLog("room.error", { roomId: room.roomId, sessionId: room.sessionId, code, message });
-    useMatchStore.getState().setError({ code: String(code), message: message ?? "Unknown error" });
+    clientLog("room.error", {
+      roomId: room.roomId,
+      sessionId: room.sessionId,
+      code,
+      message,
+    });
+    useMatchStore
+      .getState()
+      .setError({ code: String(code), message: message ?? "Unknown error" });
   });
 
   // Persist reconnection token for tab-scoped reconnect on refresh.
@@ -207,7 +241,11 @@ function wireRoom(room: Room): void {
 
 /** Ask the server to resend the private rack, with lightweight trace metadata. */
 function requestRack(room: Room, reason: string): void {
-  clientLog("room.requestRack", { roomId: room.roomId, sessionId: room.sessionId, reason });
+  clientLog("room.requestRack", {
+    roomId: room.roomId,
+    sessionId: room.sessionId,
+    reason,
+  });
   room.send("requestRack", {});
 }
 
@@ -217,7 +255,8 @@ function requestRackIfMissing(room: Room, reason: string): void {
   const snapshot = store.snapshot;
   const roomKey = `${room.roomId}:${room.sessionId}`;
   if (rackRecoveryRoomKey !== roomKey) resetRackRecovery(room);
-  if (!snapshot || snapshot.phase !== "playing" || store.rack.length > 0) return;
+  if (!snapshot || snapshot.phase !== "playing" || store.rack.length > 0)
+    return;
   const me = snapshot.players.find((p) => p.sessionId === room.sessionId);
   if (!me || me.rackCount <= 0) return;
   const now = Date.now();
@@ -326,7 +365,11 @@ export function sendStartMatch(): void {
 }
 
 /** Update lobby time controls before the match starts. */
-export function sendSetTimeControl(tc: { baseMinutes: number; incrementSeconds: number; turnMinutes: number }): void {
+export function sendSetTimeControl(tc: {
+  baseMinutes: number;
+  incrementSeconds: number;
+  turnMinutes: number;
+}): void {
   activeRoom?.send("setTimeControl", tc);
 }
 
