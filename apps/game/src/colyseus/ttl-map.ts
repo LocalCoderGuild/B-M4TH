@@ -1,9 +1,9 @@
+import { TTL_SWEEP_INTERVAL_MS } from "@entities";
+
 export interface TtlMapOptions {
   sweepIntervalMs?: number;
   now?: () => number;
 }
-
-const DEFAULT_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 export class TtlMap<V> {
   protected readonly store = new Map<string, { value: V; expiresAt: number }>();
@@ -14,7 +14,7 @@ export class TtlMap<V> {
   constructor(ttlMs: number, opts: TtlMapOptions = {}) {
     this.ttlMs = ttlMs;
     this.now = opts.now ?? Date.now;
-    const interval = opts.sweepIntervalMs ?? DEFAULT_SWEEP_INTERVAL_MS;
+    const interval = opts.sweepIntervalMs ?? TTL_SWEEP_INTERVAL_MS;
     if (interval > 0 && typeof setInterval === "function") {
       this.sweepTimer = setInterval(() => this.sweep(), interval);
       this.sweepTimer.unref?.();

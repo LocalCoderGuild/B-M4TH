@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { INVITE_TTL_MS } from "@entities";
 import { TtlMap, type TtlMapOptions } from "./ttl-map";
 
 export interface Invite {
@@ -9,15 +10,13 @@ export interface Invite {
 
 export type InviteStoreOptions = TtlMapOptions & { ttlMs?: number };
 
-const DEFAULT_TTL_MS = 60 * 60 * 1000;
-
 function mintToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
 export class InviteStore extends TtlMap<Invite> {
   constructor(opts: InviteStoreOptions = {}) {
-    super(opts.ttlMs ?? DEFAULT_TTL_MS, opts);
+    super(opts.ttlMs ?? INVITE_TTL_MS, opts);
   }
 
   /** Mint a multi-use invite for a match. Remains valid until TTL, the match

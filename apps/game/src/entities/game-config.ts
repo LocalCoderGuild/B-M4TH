@@ -41,3 +41,5 @@ export const SCHEMA_DEFAULT_TIME_CONTROL: TimeControl = {
 };
 
 export const MATCH_TTL_MS = 2 * 60 * 60 * 1000;
+export const INVITE_TTL_MS = 60 * 60 * 1000;
+export const TTL_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
