@@ -1,4 +1,3 @@
-import { ArraySchema } from "@colyseus/schema";
 import { CloseCode, Room } from "colyseus";
 import type { Client } from "colyseus";
 import type { ZodType } from "zod";
@@ -11,12 +10,17 @@ import {
   MIN_PLAYERS,
 } from "@entities";
 import { InviteStore } from "./invite-store";
-import { posKey } from "@engine/pos-key";
 import {
   minutesToMs,
   createLogger,
 } from "@b-m4th/shared";
 import { MatchRegistry } from "./match-registry";
+import {
+  findDuplicatePositionKey,
+  toEnginePlayMoves,
+  toOpponentPendingPlacements,
+  toPreviewPlayMoves,
+} from "./match-room.actions";
 import {
   createSeatRecord,
   getJoinAuthError,
@@ -24,6 +28,12 @@ import {
   pickFirstAvailableColor,
   resolveJoinName,
 } from "./match-room.join";
+import {
+  ensureActionAllowed as ensureActionAllowedGuard,
+  ensureHost as ensureHostGuard,
+  ensureLobbyOpen as ensureLobbyOpenGuard,
+  ensureRackRecoveryAllowed as ensureRackRecoveryAllowedGuard,
+} from "./match-room.guards";
 import type {
   CreateOptions,
   JoinOptions,
@@ -50,10 +60,10 @@ import {
   syncSeatBanks,
 } from "./match-room.lifecycle";
 import { syncFromEngineSnapshot } from "./match-room.projection";
+import { createInitialMatchState } from "./match-room.state";
 import {
   MatchStateSchema,
   PlayerView,
-  CellView,
 } from "./schema";
 
 const roomLog = createLogger("colyseus.MatchRoom");
@@ -113,20 +123,13 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       minPlayers,
     });
 
-    const state = new MatchStateSchema();
-    state.matchId = this.matchId;
-    state.phase = "waiting";
-    state.ready = false;
-    state.boardSize = GAME_CONFIG.BOARD_SIZE;
-    state.board = new ArraySchema<CellView>();
-    state.players = new ArraySchema<PlayerView>();
-    state.serverTime = this.nowMs();
-    state.baseMinutes = tc.baseMinutes;
-    state.incrementSeconds = tc.incrementSeconds;
-    state.turnMinutes = tc.turnMinutes;
-    state.started = false;
-    state.maxPlayers = maxPlayers;
-    state.minPlayers = minPlayers;
+    const state = createInitialMatchState({
+      matchId: this.matchId,
+      timeControl: tc,
+      maxPlayers,
+      minPlayers,
+      nowMs: this.nowMs(),
+    });
     this.setState(state);
 
     this.onMessage("play", (client, payload) => this.handlePlay(client, payload));
@@ -258,13 +261,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     const moves = parsed.data.moves;
 
     // Broadcast ghost placements to all other clients for live preview.
-    const placements = moves.map((m) => ({
-      row: m.row,
-      col: m.col,
-      face: m.face,
-      assignedFace: m.assignedFace,
-      value: m.value,
-    }));
+    const placements = toOpponentPendingPlacements(moves);
     this.broadcast("opponentPending", { sessionId: client.sessionId, placements }, { except: client });
 
     // Compute and return preview score to the active player.
@@ -272,13 +269,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       client.send("previewScore", { valid: false });
       return;
     }
-    const previewResult = this.engine.previewPlay(
-      moves.map((m) => ({
-        tileId: m.tileId,
-        position: { row: m.row, col: m.col },
-        assignedFace: m.assignedFace,
-      })),
-    );
+    const previewResult = this.engine.previewPlay(toPreviewPlayMoves(moves));
     if (previewResult.ok) {
       client.send("previewScore", { valid: true, score: previewResult.score });
     } else {
@@ -498,22 +489,11 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
 
   private handlePlay(client: Client, rawPayload: unknown): void {
     this.withActionGuard(client, playMessageSchema, rawPayload, "invalid_play", "Invalid play", (data, engine) => {
-      const moves: Array<{ tileId: string; position: Position; assignedFace?: BlankAssignment }> =
-        data.moves.map((m) => ({
-          tileId: m.tileId,
-          position: m.position,
-          assignedFace: m.assignedFace,
-        }));
-
-      // Guard against duplicate positions up-front (engine also guards, but surface cleaner error).
-      const seenPositions = new Set<string>();
-      for (const m of moves) {
-        const key = posKey(m.position.row, m.position.col);
-        if (seenPositions.has(key)) {
-          this.sendError(client, "duplicate_position", `Duplicate position: ${key}`);
-          return;
-        }
-        seenPositions.add(key);
+      const moves = toEnginePlayMoves(data.moves);
+      const duplicatePosition = findDuplicatePositionKey(moves);
+      if (duplicatePosition) {
+        this.sendError(client, "duplicate_position", `Duplicate position: ${duplicatePosition}`);
+        return;
       }
 
       const result = engine.play(moves);
@@ -681,45 +661,47 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   }
 
   private ensureActionAllowed(client: Client): boolean {
-    const now = this.nowMs();
-    const last = this.lastActionAt.get(client.sessionId) ?? 0;
-    if (now - last < MATCH_ROOM_DEFAULTS.actionRateLimitWindowMs) {
-      this.sendError(client, "rate_limited", "Slow down");
-      return false;
-    }
-    this.lastActionAt.set(client.sessionId, now);
-    return true;
+    return ensureActionAllowedGuard({
+      nowMs: this.nowMs(),
+      sessionId: client.sessionId,
+      lastActionAt: this.lastActionAt,
+      rateLimitWindowMs: MATCH_ROOM_DEFAULTS.actionRateLimitWindowMs,
+      sendError: (code, message) => this.sendError(client, code, message),
+    });
   }
 
   private ensureLobbyOpen(client: Client, alreadyStartedMsg: string): boolean {
-    if (this.state.started || this.state.phase !== "waiting") {
-      this.sendError(client, "already_started", alreadyStartedMsg);
-      return false;
-    }
-    return true;
+    return ensureLobbyOpenGuard({
+      started: this.state.started,
+      phase: this.state.phase,
+      alreadyStartedMsg,
+      sendError: (code, message) => this.sendError(client, code, message),
+    });
   }
 
   private ensureHost(client: Client, notHostMsg: string): boolean {
-    if (client.sessionId !== this.state.hostSessionId) {
-      this.sendError(client, "not_host", notHostMsg);
-      return false;
-    }
-    return true;
+    return ensureHostGuard({
+      sessionId: client.sessionId,
+      hostSessionId: this.state.hostSessionId,
+      notHostMsg,
+      sendError: (code, message) => this.sendError(client, code, message),
+    });
   }
 
   private ensureRackRecoveryAllowed(client: Client, reason: string): boolean {
-    const now = this.nowMs();
-    const last = this.lastRackRecoveryAt.get(client.sessionId) ?? 0;
-    if (now - last < MATCH_ROOM_DEFAULTS.rackRecoveryWindowMs) {
-      roomLog("rackRecovery.throttled", {
-        roomId: this.roomId,
-        matchId: this.matchId,
-        sessionId: client.sessionId,
-        reason,
-      });
-      return false;
-    }
-    this.lastRackRecoveryAt.set(client.sessionId, now);
-    return true;
+    return ensureRackRecoveryAllowedGuard({
+      nowMs: this.nowMs(),
+      sessionId: client.sessionId,
+      lastRackRecoveryAt: this.lastRackRecoveryAt,
+      rackRecoveryWindowMs: MATCH_ROOM_DEFAULTS.rackRecoveryWindowMs,
+      onThrottled: () => {
+        roomLog("rackRecovery.throttled", {
+          roomId: this.roomId,
+          matchId: this.matchId,
+          sessionId: client.sessionId,
+          reason,
+        });
+      },
+    });
   }
 }
