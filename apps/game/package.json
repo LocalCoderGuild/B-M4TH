@@ -24,11 +24,16 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@colyseus/bun-websockets": "^0.17.13",
     "@colyseus/schema": "^4.0.20",
     "@colyseus/tools": "^0.17.19",
     "@colyseus/ws-transport": "^0.17.13",
+    "@elysia/cors": "^1.4.2",
+    "@elysia/jwt": "^1.4.2",
+    "@elysia/openapi": "^1.4.15",
     "colyseus": "^0.17.10",
     "cors": "^2.8.6",
+    "elysia": "^1.4.28",
     "express": "^5.2.1",
     "seedrandom": "^3.0.5",
     "zod": "^4.3.6"
