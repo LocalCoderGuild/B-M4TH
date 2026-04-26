@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
-
-export const PLAYER_COLOR_KEYS = ["orange", "cyan", "pink", "green", "violet", "yellow"] as const;
-export type PlayerColorKey = (typeof PLAYER_COLOR_KEYS)[number];
+import { PLAYER_COLOR_KEYS, defaultColorForSeat } from "@b-m4th/shared";
+export { PLAYER_COLOR_KEYS, defaultColorForSeat };
+export type { PlayerColorKey } from "@b-m4th/shared";
 
 interface PlayerPalette {
   color: string;
@@ -90,11 +90,6 @@ function isColorKey(key: string): key is PlayerColorKey {
   return (PLAYER_COLOR_KEYS as readonly string[]).includes(key);
 }
 
-export function defaultColorForSeat(seatIndex: number): PlayerColorKey {
-  const len = PLAYER_COLOR_KEYS.length;
-  const i = ((seatIndex % len) + len) % len;
-  return PLAYER_COLOR_KEYS[i]!;
-}
 
 export function getPlayerPaletteByKey(key: string): PlayerPalette {
   return PALETTES[isColorKey(key) ? key : "orange"];

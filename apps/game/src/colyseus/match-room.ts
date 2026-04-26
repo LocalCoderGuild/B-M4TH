@@ -13,7 +13,8 @@ import {
 } from "@entities";
 import { InviteStore } from "./invite-store";
 import { posKey } from "@engine/pos-key";
-import { minutesToMs } from "@b-m4th/shared";
+import { minutesToMs, PLAYER_COLOR_KEYS, defaultColorForSeat } from "@b-m4th/shared";
+import type { PlayerColorKey } from "@b-m4th/shared";
 import { MatchRegistry } from "./match-registry";
 import { timeControlSchema } from "./schemas/time-control-schema";
 import {
@@ -90,9 +91,6 @@ const startMessageSchema = z.object({}).strict();
 
 const setTimeControlSchema = timeControlSchema;
 
-export const PLAYER_COLOR_KEYS = ["orange", "cyan", "pink", "green", "violet", "yellow"] as const;
-export type PlayerColorKey = (typeof PLAYER_COLOR_KEYS)[number];
-
 const pickColorSchema = z.object({
   color: z.union([
     z.enum(PLAYER_COLOR_KEYS),
@@ -113,10 +111,6 @@ const pendingUpdateSchema = z.object({
   moves: z.array(pendingUpdateMoveSchema).max(GAME_CONFIG.RACK_SIZE),
 });
 
-function defaultColorForSeat(seatIndex: number): PlayerColorKey {
-  const i = ((seatIndex % PLAYER_COLOR_KEYS.length) + PLAYER_COLOR_KEYS.length) % PLAYER_COLOR_KEYS.length;
-  return PLAYER_COLOR_KEYS[i]!;
-}
 
 function cellToView(cell: BoardCell): CellView {
   const view = new CellView();
