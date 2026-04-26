@@ -9,13 +9,13 @@ import {
   GAME_CONFIG,
   MAX_PLAYERS,
   MIN_PLAYERS,
-  TIME_CONTROL_LIMITS,
   VALID_BLANK_ASSIGNMENTS,
 } from "@entities";
 import { InviteStore } from "./invite-store";
 import { posKey } from "@engine/pos-key";
 import { minutesToMs } from "@b-m4th/shared";
 import { MatchRegistry } from "./match-registry";
+import { timeControlSchema } from "./schemas/time-control-schema";
 import {
   CellView,
   LastMoveView,
@@ -60,7 +60,7 @@ const RATE_LIMIT_WINDOW_MS = 500;
 const RACK_RECOVERY_WINDOW_MS = 1000;
 
 function roomLog(event: string, details: Record<string, unknown>): void {
-  console.info(JSON.stringify({ scope: "colyseus.MatchRoom", event, ...details }));
+  console.info("colyseus.MatchRoom", { event, ...details });
 }
 
 const positionSchema = z.object({
@@ -88,17 +88,7 @@ const passMessageSchema = z.object({}).strict();
 
 const startMessageSchema = z.object({}).strict();
 
-const setTimeControlSchema = z.object({
-  baseMinutes: z.number().int()
-    .min(TIME_CONTROL_LIMITS.baseMinutes.min)
-    .max(TIME_CONTROL_LIMITS.baseMinutes.max),
-  incrementSeconds: z.number().int()
-    .min(TIME_CONTROL_LIMITS.incrementSeconds.min)
-    .max(TIME_CONTROL_LIMITS.incrementSeconds.max),
-  turnMinutes: z.number().int()
-    .min(TIME_CONTROL_LIMITS.turnMinutes.min)
-    .max(TIME_CONTROL_LIMITS.turnMinutes.max),
-});
+const setTimeControlSchema = timeControlSchema;
 
 export const PLAYER_COLOR_KEYS = ["orange", "cyan", "pink", "green", "violet", "yellow"] as const;
 export type PlayerColorKey = (typeof PLAYER_COLOR_KEYS)[number];

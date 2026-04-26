@@ -75,16 +75,13 @@ export function BoardCanvas() {
       if (cancelled) scene.destroy();
       const snapshot = useMatchStore.getState().snapshot;
       if (!cancelled && snapshot && isBoardReady(snapshot)) {
-        console.info(
-          JSON.stringify({
-            scope: "pixi.BoardCanvas",
-            event: "initialRender",
-            phase: snapshot.phase,
-            ready: snapshot.ready,
-            boardLength: snapshot.board.length,
-            turnNumber: snapshot.turnNumber,
-          }),
-        );
+        console.info("pixi.BoardCanvas", {
+          event: "initialRender",
+          phase: snapshot.phase,
+          ready: snapshot.ready,
+          boardLength: snapshot.board.length,
+          turnNumber: snapshot.turnNumber,
+        });
         scene.renderBoard(snapshot.board);
         scene.renderPending(useMatchStore.getState().pending);
       }
@@ -105,16 +102,13 @@ export function BoardCanvas() {
         nextReady &&
         (prevTurn !== nextTurn || !prev.snapshot || !prevReady)
       ) {
-        console.info(
-          JSON.stringify({
-            scope: "pixi.BoardCanvas",
-            event: "renderBoard",
-            phase: state.snapshot.phase,
-            ready: state.snapshot.ready,
-            boardLength: state.snapshot.board.length,
-            turnNumber: state.snapshot.turnNumber,
-          }),
-        );
+        console.info("pixi.BoardCanvas", {
+          event: "renderBoard",
+          phase: state.snapshot.phase,
+          ready: state.snapshot.ready,
+          boardLength: state.snapshot.board.length,
+          turnNumber: state.snapshot.turnNumber,
+        });
         sceneRef.current?.renderBoard(state.snapshot.board);
         // Clear opponent ghosts immediately when the board commits (tiles are now permanent).
         sceneRef.current?.renderOpponentPending([], "");

@@ -2,9 +2,10 @@ import { Elysia } from "elysia";
 import { cors } from "@elysia/cors";
 
 import { z } from "zod";
-import { MAX_PLAYERS, MIN_PLAYERS, TIME_CONTROL_LIMITS } from "@entities";
+import { MAX_PLAYERS, MIN_PLAYERS } from "@entities";
 import { InviteStore } from "../colyseus/invite-store";
 import { MatchRegistry } from "../colyseus/match-registry";
+import { timeControlSchema } from "../colyseus/schemas/time-control-schema";
 
 export interface SeatReservation {
   room: {
@@ -34,25 +35,7 @@ export interface HttpDeps {
   publicBaseUrl?: string;
 }
 
-const timeControlBody = z
-  .object({
-    baseMinutes: z
-      .number()
-      .int()
-      .min(TIME_CONTROL_LIMITS.baseMinutes.min)
-      .max(TIME_CONTROL_LIMITS.baseMinutes.max),
-    incrementSeconds: z
-      .number()
-      .int()
-      .min(TIME_CONTROL_LIMITS.incrementSeconds.min)
-      .max(TIME_CONTROL_LIMITS.incrementSeconds.max),
-    turnMinutes: z
-      .number()
-      .int()
-      .min(TIME_CONTROL_LIMITS.turnMinutes.min)
-      .max(TIME_CONTROL_LIMITS.turnMinutes.max),
-  })
-  .optional();
+const timeControlBody = timeControlSchema.optional();
 
 const createMatchBody = z.object({
   hostName: z.string().trim().min(1).max(40),

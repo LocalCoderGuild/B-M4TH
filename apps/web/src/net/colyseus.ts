@@ -108,7 +108,7 @@ function snapshotFromState(state: any): MatchSnapshot {
 }
 
 function clientLog(event: string, details: Record<string, unknown>): void {
-  console.info(JSON.stringify({ scope: "colyseus.client", event, ...details }));
+  console.info("colyseus.client", { event, ...details });
 }
 
 /** Reset rack-recovery throttling when the active room lifecycle changes. */
