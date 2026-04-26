@@ -3,9 +3,9 @@ import z from "zod";
 export const env = z
   .object({
     ENGINE_HOST: z.string().default("0.0.0.0"),
-    ENGINE_PORT: z.coerce.number().int().default(2566),
+    ENGINE_PORT: z.coerce.number().int().default(2567),
     API_HOST: z.string().default("0.0.0.0"),
-    API_PORT: z.coerce.number().int().default(2567),
+    API_PORT: z.coerce.number().int().default(2566),
 
     PUBLIC_ENGINE_URL: z.string().optional(),
     PUBLIC_API_URL: z.string().optional(),
