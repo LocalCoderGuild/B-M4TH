@@ -16,8 +16,9 @@ export function syncFromEngineSnapshot(params: {
   seats: ReadonlyMap<string, { penaltyScoreTotal: number }>;
   playerViewForSession: (sessionId: string) => PlayerView | undefined;
   ctx: SyncFromEngineContext;
+  nowMs: number;
 }): void {
-  const { state, snapshot, seats, playerViewForSession, ctx } = params;
+  const { state, snapshot, seats, playerViewForSession, ctx, nowMs } = params;
 
   state.turnNumber = snapshot.turnNumber;
   state.currentSessionId = snapshot.currentPlayerId;
@@ -25,7 +26,7 @@ export function syncFromEngineSnapshot(params: {
   state.isFirstMove = snapshot.isFirstMove;
   state.consecutivePasses = snapshot.consecutivePasses;
   state.bagRemaining = snapshot.tileBag.length;
-  state.serverTime = Date.now();
+  state.serverTime = nowMs;
 
   state.board.clear();
   for (const row of snapshot.board) {

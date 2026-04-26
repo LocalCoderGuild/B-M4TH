@@ -1,5 +1,5 @@
 import { ArraySchema } from "@colyseus/schema";
-import { Room } from "colyseus";
+import { CloseCode, Room } from "colyseus";
 import type { Client } from "colyseus";
 import type { ZodType } from "zod";
 import { GameEngine, type GameActionResult } from "@engine/game-engine";
@@ -68,9 +68,14 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   private lastActionAt = new Map<string, number>();
   private lastRackRecoveryAt = new Map<string, number>();
   private lastPendingUpdateAt = new Map<string, number>();
-  private autoDisposeTimeoutMs = MATCH_ROOM_DEFAULTS.autoDisposeTimeoutMs;
+  private seatReservationTimeoutSeconds: number = MATCH_ROOM_DEFAULTS.seatReservationTimeoutSeconds;
+  private clockTickIntervalMs: number = MATCH_ROOM_DEFAULTS.clockTickIntervalMs;
   private turnStartedAt: number | null = null;
   private clockTickHandle: { clear: () => void } | null = null;
+
+  private nowMs(): number {
+    return this.clock.currentTime;
+  }
 
   override onCreate(options: CreateOptions & MatchRoomDefineOptions): void {
     if (!options?.matchId || !options?.seed) {
@@ -80,9 +85,17 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     this.seed = options.seed;
     this.invites = options.invites;
     this.matches = options.matches;
+    this.clock.start();
+    if (
+      typeof options.clockIntervalMs === "number" &&
+      Number.isFinite(options.clockIntervalMs) &&
+      options.clockIntervalMs > 0
+    ) {
+      this.clockTickIntervalMs = options.clockIntervalMs;
+    }
 
     this.autoDispose = true;
-    this.setSeatReservationTime(this.autoDisposeTimeoutMs);
+    this.seatReservationTimeout = this.seatReservationTimeoutSeconds;
 
     const record = this.matches?.get(this.matchId);
     const tc = record?.timeControl ?? DEFAULT_TIME_CONTROL;
@@ -107,7 +120,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     state.boardSize = GAME_CONFIG.BOARD_SIZE;
     state.board = new ArraySchema<CellView>();
     state.players = new ArraySchema<PlayerView>();
-    state.serverTime = Date.now();
+    state.serverTime = this.nowMs();
     state.baseMinutes = tc.baseMinutes;
     state.incrementSeconds = tc.incrementSeconds;
     state.turnMinutes = tc.turnMinutes;
@@ -230,7 +243,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   }
 
   private handlePendingUpdate(client: Client, rawPayload: unknown): void {
-    const now = Date.now();
+    const now = this.nowMs();
     const last = this.lastPendingUpdateAt.get(client.sessionId) ?? 0;
     if (now - last < MATCH_ROOM_DEFAULTS.pendingUpdateThrottleMs) return;
     this.lastPendingUpdateAt.set(client.sessionId, now);
@@ -322,7 +335,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       sessionId: client.sessionId,
       matchId: this.matchId,
       code,
-      consented: code === MATCH_ROOM_DEFAULTS.consentedCloseCode,
+      consented: code === CloseCode.CONSENTED,
     });
     const seat = this.seats.get(client.sessionId);
     if (seat) {
@@ -331,8 +344,8 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       if (view) view.connected = false;
     }
 
-    // code 1000 = normal closure (consented). Anything else = try reconnect.
-    const consented = code === MATCH_ROOM_DEFAULTS.consentedCloseCode;
+    // CloseCode.CONSENTED = user-initiated leave. Anything else = try reconnect.
+    const consented = code === CloseCode.CONSENTED;
     if (consented) return;
 
     try {
@@ -363,6 +376,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     this.lastActionAt.clear();
     this.lastRackRecoveryAt.clear();
     this.lastPendingUpdateAt.clear();
+    this.clock.stop();
   }
 
   /* ------------------------------------------------------------------ */
@@ -380,7 +394,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       seed: this.seed,
       consecutivePassesLimit: playerIds.length,
     });
-    this.turnStartedAt = Date.now();
+    this.turnStartedAt = this.nowMs();
     this.syncFromEngine({ action: "start", scoreDelta: 0, placedPositions: [] });
     this.state.ready = this.state.board.length === this.state.boardSize * this.state.boardSize;
     roomLog("startGame", {
@@ -404,10 +418,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
    * time is the natural ceiling on stall attacks. */
   private startClockTicker(): void {
     this.stopClockTicker();
-    const handle = this.clock.setInterval(
-      () => this.onClockTick(),
-      MATCH_ROOM_DEFAULTS.clockTickIntervalMs,
-    );
+    const handle = this.clock.setInterval(() => this.onClockTick(), this.clockTickIntervalMs);
     this.clockTickHandle = { clear: () => handle.clear() };
   }
 
@@ -421,7 +432,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     const currentId = this.state.currentSessionId;
     const view = this.playerViewForSession(currentId);
     if (!view) return;
-    const elapsed = Date.now() - this.turnStartedAt;
+    const elapsed = this.nowMs() - this.turnStartedAt;
     view.turnElapsedMs = elapsed;
     // Overage-only penalty preview (not yet applied — applied on settle).
     const allowed = Math.min(minutesToMs(this.state.turnMinutes), view.bankRemainingMs);
@@ -439,7 +450,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
     const seat = this.seats.get(outgoingSessionId);
     if (!view || !seat) return;
 
-    const elapsed = Date.now() - this.turnStartedAt;
+    const elapsed = this.nowMs() - this.turnStartedAt;
     const settled = settleTurnState({
       bankBeforeMs: view.bankRemainingMs,
       elapsedMs: elapsed,
@@ -558,7 +569,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       this.turnStartedAt = null;
     } else {
       // Start the incoming player's clock.
-      this.turnStartedAt = Date.now();
+      this.turnStartedAt = this.nowMs();
     }
     for (const sessionId of this.seats.keys()) this.broadcastRack(sessionId);
   }
@@ -612,6 +623,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
       seats: this.seats,
       playerViewForSession: (sessionId) => this.playerViewForSession(sessionId),
       ctx,
+      nowMs: this.nowMs(),
     });
   }
 
@@ -669,7 +681,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   }
 
   private ensureActionAllowed(client: Client): boolean {
-    const now = Date.now();
+    const now = this.nowMs();
     const last = this.lastActionAt.get(client.sessionId) ?? 0;
     if (now - last < MATCH_ROOM_DEFAULTS.actionRateLimitWindowMs) {
       this.sendError(client, "rate_limited", "Slow down");
@@ -696,7 +708,7 @@ export class MatchRoom extends Room<{ state: MatchStateSchema }> {
   }
 
   private ensureRackRecoveryAllowed(client: Client, reason: string): boolean {
-    const now = Date.now();
+    const now = this.nowMs();
     const last = this.lastRackRecoveryAt.get(client.sessionId) ?? 0;
     if (now - last < MATCH_ROOM_DEFAULTS.rackRecoveryWindowMs) {
       roomLog("rackRecovery.throttled", {

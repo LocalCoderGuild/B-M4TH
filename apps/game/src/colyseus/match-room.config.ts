@@ -11,11 +11,10 @@ export interface MatchRoomDefineOptions {
 }
 
 export const MATCH_ROOM_DEFAULTS = {
-  autoDisposeTimeoutMs: 30_000,
+  seatReservationTimeoutSeconds: 30,
   reconnectionGraceSeconds: 300, // 5 minutes
   actionRateLimitWindowMs: 500,
   rackRecoveryWindowMs: 1000,
   pendingUpdateThrottleMs: 100,
   clockTickIntervalMs: 500,
-  consentedCloseCode: 1000,
 } as const;
