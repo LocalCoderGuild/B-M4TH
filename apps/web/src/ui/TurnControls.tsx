@@ -1,12 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useMatchStore } from "../store/match-store";
+import { useIsMyTurn } from "../store/selectors";
 import { sendPass, sendPendingUpdate, sendPlay, sendSwap } from "../net/colyseus";
 
 export function TurnControls() {
   const pending = useMatchStore((s) => s.pending);
   const clearPending = useMatchStore((s) => s.clearPending);
-  const snapshot = useMatchStore((s) => s.snapshot);
-  const mySessionId = useMatchStore((s) => s.mySessionId);
   const swapMode = useMatchStore((s) => s.swapMode);
   const swapSelected = useMatchStore((s) => s.swapSelected);
   const setSwapMode = useMatchStore((s) => s.setSwapMode);
@@ -21,12 +20,7 @@ export function TurnControls() {
     };
   }, [pending]);
 
-  const isMyTurn = Boolean(
-    snapshot &&
-      mySessionId &&
-      snapshot.currentSessionId === mySessionId &&
-      snapshot.phase === "playing",
-  );
+  const isMyTurn = useIsMyTurn();
 
   const onSubmit = () => {
     if (pending.length === 0) return;

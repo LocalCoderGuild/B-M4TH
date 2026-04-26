@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useMatchStore } from "../store/match-store";
+import { useIsMyTurn } from "../store/selectors";
 import type { TileDto } from "../types";
 
 export function RackStrip() {
@@ -8,17 +9,13 @@ export function RackStrip() {
   const pending = useMatchStore((s) => s.pending);
   const startDrag = useMatchStore((s) => s.startDrag);
   const endDrag = useMatchStore((s) => s.endDrag);
-  const snapshot = useMatchStore((s) => s.snapshot);
-  const mySessionId = useMatchStore((s) => s.mySessionId);
   const swapMode = useMatchStore((s) => s.swapMode);
   const swapSelected = useMatchStore((s) => s.swapSelected);
   const toggleSwapPick = useMatchStore((s) => s.toggleSwapPick);
   const rackPicked = useMatchStore((s) => s.rackPicked);
   const pickRackTile = useMatchStore((s) => s.pickRackTile);
 
-  const isMyTurn = Boolean(
-    snapshot && mySessionId && snapshot.currentSessionId === mySessionId && snapshot.phase === "playing",
-  );
+  const isMyTurn = useIsMyTurn();
   const pendingIds = useMemo(() => new Set(pending.map((p) => p.tileId)), [pending]);
 
   const ordered = useMemo<TileDto[]>(() => {
