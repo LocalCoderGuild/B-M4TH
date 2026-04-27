@@ -1,9 +1,10 @@
 FROM oven/bun:1.3.10-alpine AS build
-WORKDIR /app
+WORKDIR /app/apps/web
 
 COPY apps/web/package.json apps/web/bun.lock ./
 RUN bun install
 
+COPY packages/shared /app/packages/shared
 COPY apps/web .
 
 ENV VITE_PUBLIC_URL=__VITE_PUBLIC_URL__
@@ -14,7 +15,7 @@ RUN bun run build
 
 FROM nginx:1.27-alpine AS runner
 COPY deploy/docker/nginx-web.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 COPY deploy/docker/web-entrypoint.sh /docker-entrypoint.d/40-inject-vite-env.sh
 RUN chmod +x /docker-entrypoint.d/40-inject-vite-env.sh
 
